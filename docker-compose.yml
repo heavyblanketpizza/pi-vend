@@ -1,0 +1,57 @@
+# docker compose up --build
+# Local LLM: put a GGUF file in ./models, set LLAMA_MODEL_FILE and
+# LLM_PROVIDER=llamacpp in .env, then: docker compose --profile local up --build
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: pivend
+      POSTGRES_USER: pivend
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pivend}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pivend"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://pivend:${POSTGRES_PASSWORD:-pivend}@db:5432/pivend
+      AGENT_URL: http://agent:3001
+      # "web" is the hostname the agent uses to reach the internal API.
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1},web
+      DJANGO_MEDIA_ROOT: /data/media
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE: ""
+    volumes:
+      - media:/data/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  agent:
+    build: ./agent
+    env_file: .env
+    environment:
+      BACKEND_URL: http://web:8000
+    # Not published: only Django talks to the agent.
+    extra_hosts:
+      # Lets LLM_BASE_URL=http://host.docker.internal:8080/v1 reach a llama-server on the host.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  llamacpp:
+    profiles: ["local"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    # --jinja enables the chat template's tool calling.
+    command: ["-m", "/models/${LLAMA_MODEL_FILE:-model.gguf}", "--jinja", "-c", "32768", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - ./models:/models:ro
+
+volumes:
+  pgdata:
+  media:

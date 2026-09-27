@@ -1,0 +1,216 @@
+{% extends "web/base.html" %}
+{% load static %}
+{% block title %}에이전트 · Pi-Vend{% endblock %}
+{% block head %}
+<style>
+  main { max-width: 1280px; }
+  .chat-layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; height: calc(100vh - 130px); min-height: 480px; }
+  @media (max-width: 760px) { .chat-layout { grid-template-columns: 1fr; height: auto; } .sidebar { max-height: 180px; } }
+  .sidebar { overflow-y: auto; }
+  .sidebar a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar a.current { background: var(--accent-soft); }
+  .chat { display: flex; flex-direction: column; min-height: 0; }
+  .status { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 12px; min-height: 300px; }
+  .msg { max-width: 860px; padding: 12px 16px; border-radius: 12px; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; white-space: pre-wrap; }
+  @media (prefers-color-scheme: dark) { .msg.user { color: #042F2E; } }
+  .msg.assistant { background: var(--panel); border: 1px solid var(--line); }
+  .msg.assistant p:first-child { margin-top: 0; } .msg.assistant p:last-child { margin-bottom: 0; }
+  .msg.assistant table { margin: 8px 0; }
+  .msg.assistant pre, .msg.assistant code { background: var(--code); border-radius: 6px; }
+  .msg.assistant pre { padding: 10px; overflow-x: auto; }
+  .msg.error { background: var(--error-soft); color: var(--error); }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .tool { padding: 3px 10px; border-radius: 999px; background: var(--code); color: var(--muted); }
+  .tool.running::after { content: " …"; }
+  .tool.failed { background: var(--error-soft); color: var(--error); }
+  .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .thumbs img { width: 120px; border-radius: 8px; border: 1px solid var(--line); }
+  form.composer { display: flex; gap: 8px; align-items: flex-end; }
+  form.composer textarea { resize: vertical; min-height: 52px; max-height: 240px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="chat-layout">
+  <aside class="panel sidebar">
+    <form method="post" action="{% url 'chat_new' %}">{% csrf_token %}<button type="submit" style="width:100%">+ 새 대화</button></form>
+    <div style="margin-top:12px">
+      {% for c in conversations %}
+      <a href="{% url 'chat_conversation' c.id %}" class="{% if current and c.id == current.id %}current{% endif %}">{{ c.title|default:"새 대화" }}</a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="chat">
+    <div class="status">
+      {% if agent.online %}● {{ agent.provider }} / {{ agent.model }}{% else %}<span style="color:var(--error)">● 에이전트 오프라인</span> — <code>cd agent && npm start</code>{% endif %}
+    </div>
+    {% if current %}
+    <div class="log" id="log">
+      {% for m in current.display_messages %}
+        {% if m.role == "user" %}<div class="msg user">{{ m.text }}</div>
+        {% elif m.role == "assistant" %}<div class="msg assistant" data-markdown="{{ m.text }}"></div>
+        {% elif m.role == "tools" %}<div class="tools">{% for n in m.names %}<span class="tool">{{ n }}</span>{% endfor %}</div>
+        {% elif m.role == "error" %}<div class="msg error">{{ m.text }}</div>{% endif %}
+      {% empty %}
+        <div class="muted" id="empty">
+          <p>예시:</p>
+          <ul>
+            <li>"여름 린넨 원피스" 연관 키워드 중 검색량 대비 경쟁이 낮은 키워드 찾아줘</li>
+            <li>이 키워드들로 스마트스토어 상품명 3개 제안하고 점검해줘</li>
+            <li>우리 제품 정보로 상세페이지 만들어줘: (소재, 사이즈, 특징…)</li>
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+    <form class="composer" id="composer">
+      <textarea id="input" placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)" required></textarea>
+      <button type="submit" id="send">전송</button>
+    </form>
+    {% else %}
+    <div class="panel muted">왼쪽에서 대화를 선택하거나 새 대화를 시작하세요.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if current %}
+<script src="{% static 'web/vendor/marked.min.js' %}"></script>
+<script src="{% static 'web/vendor/purify.min.js' %}"></script>
+<script>
+(() => {
+  const sendUrl = "{% url 'chat_send' current.id %}";
+  const csrf = "{{ csrf_token }}";
+  const log = document.getElementById("log");
+  const form = document.getElementById("composer");
+  const input = document.getElementById("input");
+  const button = document.getElementById("send");
+
+  const md = (text) => {
+    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text));
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML.replace(/\n/g, "<br>");
+  };
+  const scroll = () => { log.scrollTop = log.scrollHeight; };
+  const el = (cls, html) => {
+    const node = document.createElement("div");
+    node.className = cls;
+    if (html !== undefined) node.innerHTML = html;
+    log.appendChild(node);
+    scroll();
+    return node;
+  };
+
+  document.querySelectorAll("[data-markdown]").forEach((node) => { node.innerHTML = md(node.dataset.markdown); });
+  scroll();
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    document.getElementById("empty")?.remove();
+    input.value = "";
+    button.disabled = true;
+    const user = el("msg user");
+    user.textContent = text;
+    const current = document.querySelector(".sidebar a.current");
+    if (current && current.textContent.trim() === "새 대화") current.textContent = text.slice(0, 60);
+
+    let bubble = null, buffer = "", tools = null;
+    const toolNodes = {};
+    const handle = (event) => {
+      switch (event.type) {
+        case "assistant_start":
+          bubble = null; buffer = ""; break;
+        case "text_delta":
+          if (!bubble) { bubble = el("msg assistant"); tools = null; }
+          buffer += event.delta;
+          bubble.innerHTML = md(buffer);
+          scroll();
+          break;
+        case "tool_start": {
+          if (!tools) tools = el("tools");
+          const chip = document.createElement("span");
+          chip.className = "tool running";
+          chip.textContent = event.name;
+          chip.title = JSON.stringify(event.args);
+          tools.appendChild(chip);
+          toolNodes[event.id] = chip;
+          bubble = null; buffer = "";
+          scroll();
+          break;
+        }
+        case "tool_end": {
+          const chip = toolNodes[event.id];
+          if (chip) {
+            chip.classList.remove("running");
+            if (event.isError) chip.classList.add("failed");
+            chip.title = event.summary || "";
+          }
+          if (event.images?.length) {
+            const thumbs = el("thumbs");
+            for (const url of event.images) {
+              const a = document.createElement("a");
+              a.href = event.draftUrl || url;
+              a.target = "_blank";
+              const img = document.createElement("img");
+              img.src = url;
+              img.alt = "";
+              a.appendChild(img);
+              thumbs.appendChild(a);
+            }
+            tools = null;
+          }
+          break;
+        }
+        case "assistant_end":
+          if (event.errorMessage) el("msg error").textContent = event.errorMessage;
+          break;
+        case "error":
+          el("msg error").textContent = event.message;
+          break;
+      }
+    };
+
+    try {
+      const response = await fetch(sendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        let index;
+        while ((index = pending.indexOf("\n\n")) !== -1) {
+          const chunk = pending.slice(0, index);
+          pending = pending.slice(index + 2);
+          for (const line of chunk.split("\n")) {
+            if (line.startsWith("data: ")) {
+              try { handle(JSON.parse(line.slice(6))); } catch (err) { console.error(err); }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      el("msg error").textContent = String(err);
+    } finally {
+      button.disabled = false;
+      input.focus();
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

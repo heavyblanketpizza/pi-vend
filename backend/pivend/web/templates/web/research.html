@@ -1,0 +1,75 @@
+{% extends "web/base.html" %}
+{% load humanize_extras %}
+{% block title %}키워드 리서치 · Pi-Vend{% endblock %}
+{% block content %}
+<h1>키워드 리서치</h1>
+<form method="get" class="panel" style="display:flex; gap:8px;">
+  <input type="text" name="q" value="{{ query }}" placeholder="예: 린넨 원피스" required>
+  <button type="submit">조회</button>
+</form>
+
+{% if query %}
+  <h2>검색량 · 경쟁강도</h2>
+  {% if stats_error %}<div class="notice error">{{ stats_error }}</div>{% endif %}
+  {% if stats %}
+  <div class="panel table-wrap">
+    <table>
+      <tr><th>키워드</th><th class="num">PC</th><th class="num">모바일</th><th class="num">합계</th><th class="num">상품수</th><th class="num">경쟁강도</th><th>광고 경쟁</th></tr>
+      {% for k in stats.keywords %}
+      <tr>
+        <td>{{ k.query }}</td>
+        {% if k.found %}
+        <td class="num">{{ k.monthly_searches.pc|comma }}</td>
+        <td class="num">{{ k.monthly_searches.mobile|comma }}</td>
+        <td class="num"><b>{{ k.monthly_searches.total|comma }}</b></td>
+        <td class="num">{{ k.product_count|comma }}</td>
+        <td class="num">{{ k.competition_ratio }}</td>
+        <td>{{ k.ad_competition }}</td>
+        {% else %}<td colspan="6" class="muted">검색량 데이터 없음</td>{% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="muted small">경쟁강도 = 네이버쇼핑 상품수 ÷ 월간 검색수. 낮을수록 덜 붐비는 키워드입니다.</p>
+  </div>
+  {% endif %}
+
+  <div class="grid-2">
+    <div>
+      <h2>연관 키워드</h2>
+      {% if related_error %}<div class="notice error">{{ related_error }}</div>{% endif %}
+      {% if related %}
+      <div class="panel table-wrap">
+        <table>
+          <tr><th>키워드</th><th class="num">월간 검색</th><th>광고 경쟁</th></tr>
+          {% for k in related.keywords %}
+          <tr><td>{{ k.keyword }}</td><td class="num">{{ k.total|comma }}</td><td>{{ k.ad_competition }}</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    <div>
+      <h2>경쟁 상품 분석 <span class="muted small">(네이버쇼핑 상위 {{ competitors.sampled|default:0 }}개)</span></h2>
+      {% if competitors_error %}<div class="notice error">{{ competitors_error }}</div>{% endif %}
+      {% if competitors %}
+      <div class="panel">
+        <p>전체 상품수 <b>{{ competitors.total_listings|comma }}</b> · 상품명 평균 {{ competitors.title_length.mean }}자</p>
+        {% if competitors.price %}
+        <p>가격 최저 {{ competitors.price.min|comma }}원 · 중앙값 <b>{{ competitors.price.median|comma }}원</b> · 최고 {{ competitors.price.max|comma }}원</p>
+        {% endif %}
+        <p class="muted small">상품명에 자주 쓰인 단어</p>
+        <p>{% for t in competitors.top_tokens|slice:":30" %}<span class="pill">{{ t.token }} {{ t.titles }}</span>{% endfor %}</p>
+        <p class="muted small">주요 카테고리</p>
+        <p>{% for c in competitors.categories %}<span class="pill">{{ c.path }} ({{ c.count }})</span>{% endfor %}</p>
+        <p class="muted small">상위 상품</p>
+        <table>
+          {% for item in competitors.top_listings %}
+          <tr><td class="num">{{ item.rank }}</td><td>{{ item.title }}<br><span class="muted small">{{ item.mall }}</span></td><td class="num">{{ item.price|comma }}원</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

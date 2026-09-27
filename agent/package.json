@@ -1,0 +1,24 @@
+{
+  "name": "pivend-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pi-based SEO / listing agent for Korean marketplace sellers",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=../.env src/server.ts",
+    "dev": "node --watch --env-file-if-exists=../.env src/server.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.87.1",
+    "@earendil-works/pi-ai": "^0.87.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3"
+  }
+}

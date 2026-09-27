@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root {
+    --accent: {{ theme.accent }};
+    --bg: {{ theme.background }};
+    --text: {{ theme.text }};
+    --muted: {{ theme.muted }};
+    --surface: {{ theme.surface }};
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); }
+  body {
+    width: {{ width }}px;
+    color: var(--text);
+    font-family: "Pretendard", "Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "WenQuanYi Zen Hei", sans-serif;
+    word-break: keep-all;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  section { padding: 96px 64px; }
+  section + section { border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+  h2 { font-size: 40px; line-height: 1.3; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 36px; text-align: center; }
+  .eyebrow { color: var(--accent); font-weight: 700; font-size: 22px; letter-spacing: 0.02em; text-align: center; margin-bottom: 16px; }
+  .body { font-size: 22px; color: var(--muted); white-space: pre-line; text-align: center; }
+  img.full { display: block; width: 100%; border-radius: 16px; margin-top: 40px; }
+  .caption { font-size: 17px; color: var(--muted); text-align: center; margin-top: 14px; }
+
+  .hero { text-align: center; padding-top: 120px; }
+  .hero h1 { font-size: 56px; line-height: 1.25; font-weight: 800; letter-spacing: -0.03em; }
+  .hero .sub { font-size: 24px; color: var(--muted); margin-top: 24px; white-space: pre-line; }
+  .badges { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 32px; }
+  .badge { border: 2px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 8px 20px; font-size: 18px; font-weight: 700; }
+
+  .problem { background: var(--surface); }
+  .problem ul { list-style: none; display: grid; gap: 16px; max-width: 640px; margin: 0 auto; }
+  .problem li { background: var(--bg); border-radius: 14px; padding: 22px 28px 22px 64px; font-size: 22px; position: relative; }
+  .problem li::before { content: "✓"; position: absolute; left: 26px; top: 20px; color: var(--accent); font-weight: 800; }
+
+  .cards { display: grid; gap: 20px; }
+  .card { background: var(--surface); border-radius: 18px; padding: 32px 36px; }
+  .card .label { color: var(--accent); font-weight: 800; font-size: 16px; letter-spacing: 0.08em; }
+  .card h3 { font-size: 26px; font-weight: 800; margin-top: 8px; }
+  .card p { font-size: 20px; color: var(--muted); margin-top: 10px; white-space: pre-line; }
+  .card .icon { font-size: 36px; }
+
+  table.specs { width: 100%; border-collapse: collapse; font-size: 20px; }
+  table.specs th, table.specs td { padding: 18px 20px; border-bottom: 1px solid color-mix(in srgb, var(--text) 12%, transparent); text-align: left; vertical-align: top; }
+  table.specs th { width: 32%; color: var(--muted); font-weight: 600; background: var(--surface); }
+
+  ol.steps { list-style: none; counter-reset: step; display: grid; gap: 18px; }
+  ol.steps li { counter-increment: step; display: flex; gap: 20px; align-items: flex-start; font-size: 22px; }
+  ol.steps li::before { content: counter(step); flex: 0 0 48px; height: 48px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  .faq dt { font-size: 22px; font-weight: 800; margin-top: 28px; }
+  .faq dt::before { content: "Q. "; color: var(--accent); }
+  .faq dd { font-size: 20px; color: var(--muted); margin-top: 8px; white-space: pre-line; }
+  .faq dd::before { content: "A. "; font-weight: 700; }
+
+  .notice { background: var(--surface); }
+  .notice h2 { font-size: 28px; margin-bottom: 20px; }
+  .notice .body { font-size: 18px; text-align: left; }
+</style>
+</head>
+<body>
+{% for s in spec.sections %}
+  {% if s.type == "hero" %}
+  <section class="hero">
+    {% if s.eyebrow %}<p class="eyebrow">{{ s.eyebrow }}</p>{% endif %}
+    <h1>{{ s.headline|linebreaksbr }}</h1>
+    {% if s.subheadline %}<p class="sub">{{ s.subheadline }}</p>{% endif %}
+    {% if s.badges %}<div class="badges">{% for b in s.badges %}<span class="badge">{{ b }}</span>{% endfor %}</div>{% endif %}
+    {% if s.image_url %}<img class="full" src="{{ s.image_url }}" alt="">{% endif %}
+  </section>
+  {% elif s.type == "problem" %}
+  <section class="problem">
+    <h2>{{ s.headline|linebreaksbr }}</h2>
+    <ul>{% for p in s.points %}<li>{{ p }}</li>{% endfor %}</ul>
+  </section>
+  {% elif s.type == "benefits" %}
+  <section>
+    <h2>{{ s.headline|linebreaksbr }}</h2>
+    <div class="cards">
+      {% for item in s.items %}
+      <div class="card">
+        {% if item.icon %}<div class="icon">{{ item.icon }}</div>{% endif %}
+        <div class="label">POINT {{ forloop.counter|stringformat:"02d" }}</div>
+        <h3>{{ item.title }}</h3>
+        {% if item.body %}<p>{{ item.body }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% elif s.type == "feature" %}
+  <section>
+    <h2>{{ s.headline|linebreaksbr }}</h2>
+    {% if s.body %}<p class="body">{{ s.body }}</p>{% endif %}
+    {% if s.image_url %}<img class="full" src="{{ s.image_url }}" alt="">{% endif %}
+    {% if s.caption %}<p class="caption">{{ s.caption }}</p>{% endif %}
+  </section>
+  {% elif s.type == "specs" %}
+  <section>
+    <h2>{{ s.headline|default:"제품 정보" }}</h2>
+    <table class="specs">
+      {% for row in s.rows %}<tr><th>{{ row.label }}</th><td>{{ row.value }}</td></tr>{% endfor %}
+    </table>
+  </section>
+  {% elif s.type == "howto" %}
+  <section>
+    <h2>{{ s.headline|linebreaksbr }}</h2>
+    <ol class="steps">{% for step in s.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+  </section>
+  {% elif s.type == "trust" %}
+  <section>
+    <h2>{{ s.headline|linebreaksbr }}</h2>
+    <div class="cards">
+      {% for item in s.items %}
+      <div class="card"><h3>{{ item.title }}</h3>{% if item.body %}<p>{{ item.body }}</p>{% endif %}</div>
+      {% endfor %}
+    </div>
+  </section>
+  {% elif s.type == "faq" %}
+  <section class="faq">
+    <h2>{{ s.headline|default:"자주 묻는 질문" }}</h2>
+    <dl>{% for item in s.items %}<dt>{{ item.q }}</dt><dd>{{ item.a }}</dd>{% endfor %}</dl>
+  </section>
+  {% elif s.type == "notice" %}
+  <section class="notice">
+    <h2>{{ s.headline }}</h2>
+    <p class="body">{{ s.body }}</p>
+  </section>
+  {% elif s.type == "text" %}
+  <section>
+    {% if s.headline %}<h2>{{ s.headline|linebreaksbr }}</h2>{% endif %}
+    <p class="body">{{ s.body }}</p>
+  </section>
+  {% endif %}
+{% endfor %}
+</body>
+</html>

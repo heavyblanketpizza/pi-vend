@@ -1,0 +1,16 @@
+{% extends "web/base.html" %}
+{% block title %}로그인 · Pi-Vend{% endblock %}
+{% block content %}
+<div class="panel" style="max-width: 380px; margin: 48px auto;">
+  <h1>로그인</h1>
+  {% if form.errors %}<div class="notice error">아이디 또는 비밀번호가 올바르지 않습니다.</div>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <p><label>아이디<br><input type="text" name="username" autofocus required></label></p>
+    <p><label>비밀번호<br><input type="password" name="password" required></label></p>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit">로그인</button>
+  </form>
+  <p class="muted small">계정은 <code>python manage.py createsuperuser</code>로 만듭니다.</p>
+</div>
+{% endblock %}

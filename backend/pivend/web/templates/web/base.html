@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Pi-Vend{% endblock %}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+  :root {
+    --bg: #FAFAF9; --panel: #FFFFFF; --text: #1C1917; --muted: #78716C; --line: #E7E5E4;
+    --accent: #0F766E; --accent-soft: #CCFBF1; --warn: #B45309; --warn-soft: #FEF3C7;
+    --error: #B91C1C; --error-soft: #FEE2E2; --code: #F5F5F4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C0A09; --panel: #1C1917; --text: #F5F5F4; --muted: #A8A29E; --line: #292524;
+      --accent: #2DD4BF; --accent-soft: #134E4A; --warn: #FBBF24; --warn-soft: #451A03;
+      --error: #F87171; --error-soft: #450A0A; --code: #292524;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; word-break: keep-all; }
+  a { color: var(--accent); }
+  header { display: flex; align-items: center; gap: 20px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  header .brand { font-weight: 800; color: var(--text); text-decoration: none; }
+  header nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+  header nav a { color: var(--muted); text-decoration: none; }
+  header nav a.active { color: var(--text); font-weight: 700; }
+  header form { margin: 0; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  h2 { font-size: 17px; margin: 28px 0 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=text], input[type=password], textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; }
+  button, .button { display: inline-block; padding: 9px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+  @media (prefers-color-scheme: dark) { button, .button { color: #042F2E; } }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--code); font-size: 12px; margin: 2px 4px 2px 0; }
+  .notice { padding: 10px 14px; border-radius: 8px; margin: 8px 0; }
+  .notice.error { background: var(--error-soft); color: var(--error); }
+  .notice.warning { background: var(--warn-soft); color: var(--warn); }
+  .notice.success, .notice.info { background: var(--accent-soft); color: var(--accent); }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .table-wrap { overflow-x: auto; }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<header>
+  <a class="brand" href="{% url 'home' %}">Pi-Vend</a>
+  {% if user.is_authenticated %}
+  <nav>
+    <a href="{% url 'chat' %}" class="{% if request.resolver_match.url_name|slice:':4' == 'chat' %}active{% endif %}">에이전트</a>
+    <a href="{% url 'research' %}" class="{% if request.resolver_match.url_name == 'research' %}active{% endif %}">키워드 리서치</a>
+    <a href="{% url 'drafts' %}" class="{% if request.resolver_match.url_name|slice:':5' == 'draft' %}active{% endif %}">상품 초안</a>
+    {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
+  </nav>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
+  {% endif %}
+</header>
+<main>
+  {% for message in messages %}<div class="notice {{ message.tags }}">{{ message }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

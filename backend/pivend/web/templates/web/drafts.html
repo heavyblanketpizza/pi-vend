@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+{% block title %}상품 초안 · Pi-Vend{% endblock %}
+{% block content %}
+<h1>상품 초안</h1>
+{% if drafts %}
+<div class="panel table-wrap">
+  <table>
+    <tr><th>상품</th><th>상품명</th><th>마켓</th><th>상태</th><th>수정일</th></tr>
+    {% for d in drafts %}
+    <tr>
+      <td><a href="{% url 'draft_detail' d.id %}">{{ d.product_name }}</a></td>
+      <td>{{ d.title|default:"—" }}</td>
+      <td>{{ d.get_marketplace_display }}</td>
+      <td>{{ d.get_status_display }}</td>
+      <td class="muted small">{{ d.updated_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="panel muted">아직 초안이 없습니다. <a href="{% url 'chat' %}">에이전트</a>에게 상품명과 상세페이지를 만들어 달라고 해보세요.</div>
+{% endif %}
+{% endblock %}

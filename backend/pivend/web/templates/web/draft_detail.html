@@ -1,0 +1,46 @@
+{% extends "web/base.html" %}
+{% block title %}{{ draft.product_name }} · Pi-Vend{% endblock %}
+{% block content %}
+<p><a href="{% url 'drafts' %}">← 상품 초안</a></p>
+<h1>{{ draft.product_name }} <span class="pill">{{ draft.get_marketplace_display }}</span> <span class="pill">{{ draft.get_status_display }}</span></h1>
+
+<div class="grid-2">
+  <div class="panel">
+    <h2 style="margin-top:0">상품명</h2>
+    <p style="font-size:18px; font-weight:700">{{ draft.title|default:"(없음)" }}</p>
+    {% if check %}
+      <p class="muted small">{{ check.length }}자 · 단어 {{ check.word_count }}개</p>
+      {% for issue in check.issues %}<div class="notice {{ issue.level }}">{{ issue.message }}</div>{% endfor %}
+      {% if not check.issues %}<div class="notice success">문제 없음</div>{% endif %}
+    {% endif %}
+    <h2>태그</h2>
+    <p>{% for t in draft.tags %}<span class="pill">{{ t }}</span>{% empty %}<span class="muted">—</span>{% endfor %}</p>
+    <h2>타깃 키워드</h2>
+    <p>{% for t in draft.target_keywords %}<span class="pill">{{ t }}</span>{% empty %}<span class="muted">—</span>{% endfor %}</p>
+    <h2>카테고리</h2>
+    <p>{{ draft.category_path|default:"—" }}</p>
+    {% if draft.attributes %}
+    <h2>속성</h2>
+    <table>{% for k, v in draft.attributes.items %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
+    {% endif %}
+    {% if draft.notes %}<h2>메모</h2><p style="white-space:pre-line">{{ draft.notes }}</p>{% endif %}
+    <div style="display:flex; gap:8px; margin-top:20px;">
+      <form method="post" action="{% url 'draft_render' draft.id %}">{% csrf_token %}<button class="secondary" type="submit">상세페이지 다시 렌더링</button></form>
+      {% if draft.status != "approved" %}
+      <form method="post" action="{% url 'draft_approve' draft.id %}">{% csrf_token %}<button type="submit">승인</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div>
+    <h2 style="margin-top:0">상세페이지</h2>
+    {% if render %}
+      <p class="muted small">860px · {{ render.height }}px · 이미지 {{ render.images|length }}장 · {{ render.created_at|date:"Y-m-d H:i" }}</p>
+      <div class="panel" style="padding:0; overflow:hidden;">
+        {% for url in render.image_urls %}<a href="{{ url }}" target="_blank"><img src="{{ url }}" alt="상세페이지 {{ forloop.counter }}" style="display:block; width:100%;"></a>{% endfor %}
+      </div>
+    {% else %}
+      <div class="panel muted">아직 렌더링된 상세페이지가 없습니다.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+[project]
+name = "pivend-backend"
+version = "0.1.0"
+description = "Pi-Vend backend: seller data, keyword research, listing drafts and detail page rendering"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2,<5.3",
+    "django-environ>=0.12",
+    "gunicorn>=23",
+    "httpx>=0.28",
+    "kiwipiepy>=0.20",
+    "pillow>=11",
+    "playwright>=1.50",
+    "psycopg[binary]>=3.2",
+    "whitenoise>=6.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "respx>=0.23.1",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.test_settings"
+testpaths = ["tests"]
