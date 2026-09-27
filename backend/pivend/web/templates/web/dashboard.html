@@ -1,0 +1,257 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}대시보드 · Pi-Vend{% endblock %}
+{% block content %}
+<div class="page page-wide">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">{% if data %}{{ data.period.start|date:"Y.m.d" }} – {{ data.period.end|date:"Y.m.d" }}{% else %}STORE OVERVIEW{% endif %}</div>
+      <h1 class="page-title">대시보드</h1>
+    </div>
+    {% if data %}
+    <form class="filters" method="get">
+      <nav class="tabs" aria-label="기간">
+        {% for p in periods %}<a class="tab" href="?days={{ p }}{% if store_id %}&store={{ store_id }}{% endif %}" {% if days == p %}aria-current="page"{% endif %}>{{ p }}일</a>{% endfor %}
+      </nav>
+      <label class="select-wrap">
+        <span class="sr-only">스토어</span>
+        <select class="select" name="store" onchange="this.form.submit()">
+          <option value="">모든 스토어</option>
+          {% for s in stores %}<option value="{{ s.id }}" {% if store_id == s.id %}selected{% endif %}>{{ s.name }} · {{ s.get_marketplace_display }}</option>{% endfor %}
+        </select>
+        <input type="hidden" name="days" value="{{ days }}">
+      </label>
+      <a class="btn btn-secondary" href="{% url 'data_sources' %}">{% icon "download" %}데이터 연결</a>
+    </form>
+    {% endif %}
+  </header>
+
+  {% if not data %}
+  <section class="onboard">
+    <div class="onboard-copy">
+      <div class="eyebrow">STEP 01 — CONNECT</div>
+      <h2>내 스토어 숫자를<br>한 화면에.</h2>
+      <p>스마트스토어 비즈어드바이저, 쿠팡 WING·광고 리포트를 올리면 매출·전환·유입 키워드·광고 효율을 시장 검색 데이터와 함께 보여드려요.</p>
+      <div class="row" style="margin-top:24px;flex-wrap:wrap">
+        <a class="btn btn-primary btn-lg" href="{% url 'data_sources' %}">{% icon "download" %}리포트 업로드</a>
+        <form method="post" action="{% url 'demo_data' %}">{% csrf_token %}<button class="btn btn-accent btn-lg" type="submit">{% icon "sparkles" %}데모 데이터로 둘러보기</button></form>
+      </div>
+    </div>
+    <div class="onboard-grid" aria-hidden="true">
+      <div class="og og-a"><span>매출</span><b>+18%</b></div>
+      <div class="og og-b"><span>ROAS</span><b>352%</b></div>
+      <div class="og og-c"><span>전환율</span><b>3.1%</b></div>
+      <div class="og og-d"><span>유입 키워드</span><b>린넨원피스</b></div>
+    </div>
+  </section>
+  {% else %}
+
+  {% if data.is_demo %}
+  <div class="callout callout-info demo-note">{% icon "info" %}<span>데모 데이터를 보고 있어요. <a href="{% url 'data_sources' %}">실제 리포트를 연결</a>하면 이 자리에 내 스토어 숫자가 표시돼요.</span></div>
+  {% endif %}
+
+  <div class="bento">
+    <!-- Revenue hero -->
+    <section class="card tile-hero span-8">
+      <div class="card-header">
+        <div>
+          <div class="card-title">{% icon "chart-column" %}매출</div>
+          <div class="card-desc">최근 {{ data.period.days }}일 · 직전 {{ data.period.days }}일과 비교</div>
+        </div>
+        <div class="legend">
+          <span class="key"><i class="key-line s1"></i>이번 기간</span>
+          <span class="key"><i class="key-line compare"></i>직전 기간</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="hero-row">
+          <div class="hero-figure">{{ hero.value|comma }}<small>원</small></div>
+          {% include "web/_delta.html" with k=hero %}
+        </div>
+        <figure class="viz" data-chart="line">
+          <svg class="chart line-chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="일별 매출 추이" tabindex="0">
+            <defs><linearGradient id="rev-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="fill-top"/><stop offset="1" class="fill-bottom"/></linearGradient></defs>
+            {% for t in chart.y_ticks %}<line class="grid" x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ t.y }}" y2="{{ t.y }}"/><text class="tick" x="{{ chart.left|add:-8 }}" y="{{ t.y }}" dy="4" text-anchor="end">{{ t.text }}</text>{% endfor %}
+            {% for s in chart.series %}
+              {% if s.role == "primary" %}<path class="area" d="{{ s.area }}" fill="url(#rev-fill)"/>{% endif %}
+            {% endfor %}
+            {% for s in chart.series %}<path class="line {% if s.role == 'compare' %}compare{% else %}s1{% endif %}" d="{{ s.line }}"/>{% endfor %}
+            {% with s=chart.series.0 %}<circle class="end-dot" cx="{{ s.end.x }}" cy="{{ s.end.y }}" r="4.5"/>{% endwith %}
+            {% for l in chart.x_labels %}<text class="tick" x="{{ l.x }}" y="{{ chart.label_y }}" text-anchor="middle">{{ l.text }}</text>{% endfor %}
+            <line class="crosshair" x1="0" x2="0" y1="16" y2="{{ chart.base }}" hidden/>
+          </svg>
+          {{ chart.hover|json_script:"revenue-hover" }}
+        </figure>
+        <details class="table-view">
+          <summary>표로 보기</summary>
+          <div class="table-wrap"><table class="table">
+            <thead><tr><th>날짜</th><th class="num">매출</th><th class="num">직전 기간</th><th class="num">주문</th></tr></thead>
+            <tbody>{% for day, rev, prev, ords in chart_rows %}<tr><td>{{ day|date:"n월 j일 (D)" }}</td><td class="num">{{ rev|comma }}</td><td class="num">{{ prev|comma }}</td><td class="num">{{ ords|comma }}</td></tr>{% endfor %}</tbody>
+          </table></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Next moves -->
+    <section class="card tile-moves span-4">
+      <div class="card-header"><div><div class="card-title">{% icon "zap" %}다음 액션</div><div class="card-desc">숫자에서 찾은 할 일</div></div></div>
+      <div class="card-body moves">
+        {% for i in insights %}
+        <article class="move {{ i.level }}">
+          <div class="move-level">{% if i.level == "critical" %}{% icon "circle-x" "i-sm" %}긴급{% elif i.level == "warning" %}{% icon "triangle-alert" "i-sm" %}주의{% elif i.level == "good" %}{% icon "trending-up" "i-sm" %}기회{% else %}{% icon "info" "i-sm" %}참고{% endif %}</div>
+          <h3>{{ i.title }}</h3>
+          <p>{{ i.body }}</p>
+          <button class="btn btn-ghost btn-sm move-go" type="button" data-copilot="{{ i.prompt }}">에이전트에게 맡기기 {% icon "arrow-right" "i-sm" %}</button>
+        </article>
+        {% empty %}
+        <p class="subtle">지금은 눈에 띄는 변화가 없어요.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- KPI tiles -->
+    {% for k in tiles %}
+    <section class="stat stat-{{ k.key }} span-3">
+      <div class="stat-label">{{ k.label }}</div>
+      <div class="stat-value">{% if k.unit == "원" %}{{ k.value|comma }}<small>원</small>{% elif k.unit == "%" %}{{ k.value }}<small>%</small>{% else %}{{ k.value|comma }}<small>{{ k.unit }}</small>{% endif %}</div>
+      <div class="stat-foot">
+        {% include "web/_delta.html" with k=k %}
+        {% if k.spark %}<svg class="spark" viewBox="0 0 {{ k.spark.width }} {{ k.spark.height }}" aria-hidden="true"><path d="{{ k.spark.d }}"/><circle cx="{{ k.spark.end.x }}" cy="{{ k.spark.end.y }}" r="3"/></svg>{% endif %}
+      </div>
+    </section>
+    {% endfor %}
+
+    <!-- Products -->
+    <section class="card span-8">
+      <div class="card-header"><div><div class="card-title">{% icon "package" %}상품별 매출</div><div class="card-desc">상위 {{ data.products|length }}개 · 점유율과 직전 기간 대비</div></div></div>
+      <div class="card-body flush">
+        <div class="table-wrap">
+          <table class="table" data-sortable>
+            <thead><tr><th data-sort="text">상품</th><th class="num" data-sort="num" aria-sort="descending">매출</th><th class="num hide-sm" data-sort="num">주문</th><th class="num" data-sort="num">변화</th><th class="hide-sm">추이</th></tr></thead>
+            <tbody>
+              {% for p in data.products %}
+              <tr>
+                <td data-value="{{ p.name }}"><div class="prod"><span class="market {{ p.marketplace }}"></span><span class="prod-name">{{ p.name }}</span></div></td>
+                <td class="num" data-value="{{ p.revenue }}"><div class="bar-cell"><span>{{ p.revenue|compact }}</span><span class="bar"><span style="width:{{ p.bar }}%"></span></span><span class="share subtle">{{ p.share }}%</span></div></td>
+                <td class="num hide-sm" data-value="{{ p.orders }}">{{ p.orders|comma }}</td>
+                <td class="num" data-value="{{ p.delta|default:0 }}"><span class="delta-text {{ p.trend }}">{% if p.delta is None %}—{% elif p.delta > 0 %}+{{ p.delta }}%{% else %}{{ p.delta }}%{% endif %}</span></td>
+                <td class="hide-sm">{% if p.spark %}<svg class="spark sm" viewBox="0 0 {{ p.spark.width }} {{ p.spark.height }}" aria-hidden="true"><path d="{{ p.spark.d }}"/></svg>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="span-4 stack">
+      <section class="card">
+        <div class="card-header"><div><div class="card-title">{% icon "store" %}채널 비중</div><div class="card-desc">기간 매출 기준</div></div></div>
+        <div class="card-body">
+          <div class="split-bar" role="img" aria-label="채널별 매출 비중">
+            {% for c in data.channels %}<span class="seg s{{ forloop.counter }}" style="flex:{{ c.share }}" data-tip="{{ c.label }}|{{ c.revenue|comma }}원 · {{ c.share }}%" tabindex="0"></span>{% endfor %}
+          </div>
+          <ul class="legend-list">
+            {% for c in data.channels %}<li><i class="key-rect s{{ forloop.counter }}"></i><span>{{ c.label }}</span><b>{{ c.share }}%</b><span class="subtle tnum">{{ c.revenue|compact }}원</span></li>{% endfor %}
+          </ul>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><div><div class="card-title">{% icon "clock" %}요일별 평균 매출</div><div class="card-desc">가장 강한 요일을 강조했어요</div></div></div>
+        <div class="card-body">
+          <svg class="chart col-chart" viewBox="0 0 {{ weekday.width }} {{ weekday.height }}" role="img" aria-label="요일별 평균 매출">
+            <line class="axis" x1="0" x2="{{ weekday.width }}" y1="{{ weekday.base }}" y2="{{ weekday.base }}"/>
+            {% for c in weekday.cols %}
+            <g class="col {% if c.highlight %}hi{% endif %}" tabindex="0" data-tip="{{ c.label }}요일|평균 {{ c.value|comma }}원">
+              <rect class="hit" x="{{ c.hit_x }}" y="{{ weekday.hit_y }}" width="{{ c.hit_w }}" height="{{ weekday.hit_h }}"/>
+              <path d="{{ c.d }}"/>
+              {% if c.highlight %}<text class="val" x="{{ c.cx }}" y="{{ c.top|add:-8 }}" text-anchor="middle">{{ c.value|compact }}</text>{% endif %}
+              <text class="tick" x="{{ c.cx }}" y="{{ weekday.label_y }}" text-anchor="middle">{{ c.label }}</text>
+            </g>
+            {% endfor %}
+          </svg>
+        </div>
+      </section>
+    </div>
+
+    <!-- Keywords x market -->
+    <section class="card span-7">
+      <div class="card-header"><div><div class="card-title">{% icon "scan-search" %}유입 키워드 × 시장 수요</div><div class="card-desc">내 스토어 유입과 네이버 월간 검색수를 함께 봐요 · 점유 = 기간 검색량 중 우리 유입</div></div></div>
+      <div class="card-body flush">
+        {% if data.keywords %}
+        <div class="table-wrap">
+          <table class="table" data-sortable>
+            <thead><tr><th data-sort="text">키워드</th><th class="num" data-sort="num" aria-sort="descending">유입</th><th class="num" data-sort="num">전환율</th><th class="num hide-sm" data-sort="num">월 검색</th><th class="num" data-sort="num">점유</th></tr></thead>
+            <tbody>
+              {% for k in data.keywords %}
+              <tr>
+                <td data-value="{{ k.keyword }}"><a class="kw-link" href="{% url 'research' %}?q={{ k.keyword|urlencode }}">{{ k.keyword }}</a></td>
+                <td class="num" data-value="{{ k.visits }}"><div class="bar-cell">{{ k.visits|comma }}<span class="bar"><span style="width:{{ k.bar }}%"></span></span></div></td>
+                <td class="num" data-value="{{ k.conversion }}">{{ k.conversion }}%</td>
+                <td class="num hide-sm" data-value="{{ k.market|default:0 }}">{% if k.market %}{{ k.market|comma }}{% else %}<a class="subtle" href="{% url 'research' %}?q={{ k.keyword|urlencode }}" title="리서치에서 조회">조회</a>{% endif %}</td>
+                <td class="num" data-value="{{ k.capture|default:0 }}">{% if k.capture is not None %}{{ k.capture }}%{% else %}<span class="subtle">—</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty sm"><p>유입 키워드 리포트를 올리면 시장 검색량과 비교해 보여드려요.</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card span-5">
+      <div class="card-header"><div><div class="card-title">{% icon "zap" %}광고 효율</div><div class="card-desc">키워드별 광고비와 ROAS (전환매출 ÷ 광고비)</div></div>
+        {% if data.ads %}<div class="roas-total"><span class="subtle">전체 ROAS</span><b>{{ data.ads.roas }}%</b></div>{% endif %}
+      </div>
+      <div class="card-body flush">
+        {% if data.ads %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>키워드</th><th class="num">광고비</th><th class="num">ROAS</th></tr></thead>
+            <tbody>
+              {% for k in data.ads.keywords %}
+              <tr>
+                <td>{{ k.keyword }}</td>
+                <td class="num"><div class="bar-cell">{{ k.spend|compact }}<span class="bar"><span style="width:{{ k.bar }}%"></span></span></div></td>
+                <td class="num">{% if k.roas < 150 %}<span class="status critical">{% icon "circle-x" "i-sm" %}{{ k.roas }}%</span>{% elif k.roas < 300 %}<span class="status warning">{% icon "triangle-alert" "i-sm" %}{{ k.roas }}%</span>{% else %}<span class="status good">{% icon "circle-check" "i-sm" %}{{ k.roas }}%</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty sm"><p>광고 리포트를 올리면 키워드별 ROAS를 보여드려요.</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Market watch -->
+    <section class="card span-12">
+      <div class="card-header">
+        <div><div class="card-title">{% icon "trending-up" %}시장 수요 워치</div><div class="card-desc">초안 타깃 키워드와 주요 유입 키워드의 네이버 월간 검색수 (리서치 캐시 기준)</div></div>
+        <a class="btn btn-ghost btn-sm" href="{% url 'research' %}">키워드 리서치 {% icon "arrow-right" "i-sm" %}</a>
+      </div>
+      <div class="card-body">
+        {% if data.market %}
+        <div class="watch">
+          {% for m in data.market %}
+          <a class="watch-item" href="{% url 'research' %}?q={{ m.keyword|urlencode }}">
+            <span class="w-kw">{{ m.keyword }}</span>
+            <span class="w-vol">{{ m.volume|compact }}<small>회/월</small></span>
+            <span class="bar"><span style="width:{{ m.bar }}%"></span></span>
+            <span class="w-meta">모바일 {{ m.mobile_share }}% · 광고 경쟁 {{ m.competition|default:"—" }}</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="subtle">키워드 리서치에서 조회한 키워드가 여기에 쌓여요.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+  {% endif %}
+</div>
+<div class="viz-tip" role="tooltip" hidden></div>
+{% endblock %}

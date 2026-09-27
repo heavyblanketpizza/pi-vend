@@ -90,3 +90,100 @@ def price_positions(price: dict) -> dict | None:
     pos = {k: round((price[k] - low) / span * 100, 2) for k in ("p25", "median", "p75")}
     pos["iqr_width"] = round(pos["p75"] - pos["p25"], 2)
     return pos
+
+
+# ---------------------------------------------------------------- dashboard charts
+
+def nice_ticks(peak: float, count: int = 4) -> list[float]:
+    """Clean y-axis ticks from 0 to just above the peak (0 / 50만 / 100만 ...)."""
+    if peak <= 0:
+        return [0, 1]
+    raw = peak / count
+    magnitude = 10 ** math.floor(math.log10(raw))
+    step = next(m * magnitude for m in (1, 2, 2.5, 5, 10) if m * magnitude >= raw)
+    ticks = [0.0]
+    while ticks[-1] < peak:
+        ticks.append(round(ticks[-1] + step, 6))
+    return ticks
+
+
+def won_short(value: float) -> str:
+    """Axis labels in Korean units: 1억, 350만, 9,500."""
+    value = float(value)
+    if value >= 100_000_000:
+        return f"{value / 100_000_000:.1f}".rstrip("0").rstrip(".") + "억"
+    if value >= 10_000:
+        return f"{value / 10_000:.0f}만" if value % 10_000 == 0 or value >= 1_000_000 else f"{value / 10_000:.1f}만"
+    return f"{value:,.0f}"
+
+
+def line_chart(days: list, series: list[dict], width: int = 760, height: int = 260) -> dict:
+    """Line/area chart on ONE y-axis. series: [{"name", "values", "role": "primary"|"compare"}]."""
+    pad_l, pad_r, pad_t, pad_b = 48, 16, 16, 30
+    inner_w, inner_h = width - pad_l - pad_r, height - pad_t - pad_b
+    n = len(days)
+    peak = max((max(s["values"]) for s in series if s["values"]), default=0)
+    ticks = nice_ticks(peak)
+    top = ticks[-1] or 1
+    xs = [pad_l + (i * inner_w / (n - 1) if n > 1 else inner_w / 2) for i in range(n)]
+
+    def y(v):
+        return pad_t + inner_h * (1 - v / top)
+
+    base = pad_t + inner_h
+    out_series = []
+    for s in series:
+        ys = [y(v) for v in s["values"]]
+        path = monotone_path(xs, ys)
+        out_series.append({
+            **s,
+            "line": path,
+            "area": f"{path} L{xs[-1]:.1f},{base:.1f} L{xs[0]:.1f},{base:.1f} Z" if s.get("role") == "primary" else "",
+            "end": {"x": round(xs[-1], 1), "y": round(ys[-1], 1)},
+        })
+    step = max(1, math.ceil(n / 6))
+    x_labels = [{"x": round(xs[i], 1), "text": f"{days[i].month}.{days[i].day}"} for i in range(0, n, step)]
+    return {
+        "width": width, "height": height, "series": out_series, "base": base,
+        "left": pad_l, "right": width - pad_r,
+        "y_ticks": [{"y": round(y(t), 1), "text": won_short(t)} for t in ticks],
+        "x_labels": x_labels, "label_y": height - 8,
+        "hover": {
+            "x": [round(v, 1) for v in xs],
+            "labels": [f"{d.month}월 {d.day}일" for d in days],
+            "series": [{"name": s["name"], "role": s.get("role", "primary"), "values": s["values"]} for s in series],
+        },
+    }
+
+
+def column_chart(items: list[dict], width: int = 360, height: int = 200) -> dict:
+    """Columns from one baseline. items: [{"label", "value", "highlight"}]."""
+    pad_l, pad_r, pad_t, pad_b = 8, 8, 24, 26
+    inner_w, inner_h = width - pad_l - pad_r, height - pad_t - pad_b
+    peak = max((i["value"] for i in items), default=0) or 1
+    band = inner_w / max(len(items), 1)
+    bar_w = min(24, band - 8)
+    base = pad_t + inner_h
+    cols = []
+    for idx, item in enumerate(items):
+        h = max(inner_h * item["value"] / peak, 2 if item["value"] else 0)
+        x = pad_l + band * idx + (band - bar_w) / 2
+        top = base - h
+        r = min(4, h)
+        # 4px rounded data-end, square at the baseline.
+        d = (f"M{x:.1f},{base:.1f} V{top + r:.1f} Q{x:.1f},{top:.1f} {x + r:.1f},{top:.1f} "
+             f"H{x + bar_w - r:.1f} Q{x + bar_w:.1f},{top:.1f} {x + bar_w:.1f},{top + r:.1f} V{base:.1f} Z")
+        cols.append({**item, "d": d, "cx": round(x + bar_w / 2, 1), "top": round(top, 1),
+                     "hit_x": round(pad_l + band * idx, 1), "hit_w": round(band, 1)})
+    return {"width": width, "height": height, "base": base, "cols": cols, "label_y": height - 8, "hit_y": pad_t, "hit_h": inner_h}
+
+
+def sparkline(values: list[float], width: int = 120, height: int = 32) -> dict | None:
+    if len(values) < 2 or not any(values):
+        return None
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1
+    pad = 3
+    xs = [pad + i * (width - 2 * pad) / (len(values) - 1) for i in range(len(values))]
+    ys = [pad + (height - 2 * pad) * (1 - (v - lo) / span) for v in values]
+    return {"width": width, "height": height, "d": monotone_path(xs, ys), "end": {"x": round(xs[-1], 1), "y": round(ys[-1], 1)}}

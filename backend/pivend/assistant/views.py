@@ -13,6 +13,7 @@ from django.http import HttpResponseBadRequest, JsonResponse, StreamingHttpRespo
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from .models import Conversation
@@ -69,6 +70,7 @@ def _sse(payload: dict) -> str:
 
 
 @login_required
+@xframe_options_sameorigin
 def chat(request, conversation_id: int | None = None):
     current = None
     if conversation_id is not None:
@@ -81,6 +83,7 @@ def chat(request, conversation_id: int | None = None):
             "history": current.display_messages() if current else [],
             "suggestions": SUGGESTIONS,
             "prefill": request.GET.get("prompt", "")[:2000],
+            "embed": request.GET.get("embed") == "1",
         },
     )
 

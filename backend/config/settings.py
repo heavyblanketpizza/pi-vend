@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "pivend.research",
     "pivend.listings",
     "pivend.assistant",
+    "pivend.store",
     "pivend.web",
 ]
 
@@ -99,7 +100,7 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "chat"
+LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
 # --- Naver APIs ---------------------------------------------------------------

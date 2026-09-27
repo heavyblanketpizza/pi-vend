@@ -85,6 +85,20 @@ export function createTools(backend: Backend, userId: number): AgentTool<any, Re
 	return [
 		tool(
 			{
+				name: "store_overview",
+				label: "Store overview",
+				description:
+					"The seller's own store numbers for the last 7, 30 or 90 days compared with the previous period: revenue, orders, " +
+					"average order value, conversion rate, ad ROAS, channel split, top products, weekday pattern, inflow keywords " +
+					"(with Naver search volume and capture share), ad keywords and rule-based insights. Use it before advising on the seller's business.",
+				parameters: Type.Object({
+					days: Type.Optional(stringEnum(["7", "30", "90"] as const, "Period length in days (default 30)")),
+				}),
+			},
+			async (p, signal) => json(await post("store/overview", { days: Number(p.days ?? 30) }, signal)),
+		),
+		tool(
+			{
 				name: "keyword_stats",
 				label: "Keyword volume",
 				description:

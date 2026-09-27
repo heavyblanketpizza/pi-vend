@@ -1,0 +1,123 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}데이터 연결 · Pi-Vend{% endblock %}
+{% block content %}
+<div class="page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">DATA SOURCES</div>
+      <h1 class="page-title">데이터 연결</h1>
+      <p class="page-subtitle">마켓 리포트 파일을 올리면 대시보드와 에이전트가 내 스토어 숫자로 분석해요.</p>
+    </div>
+  </header>
+
+  <div class="bento">
+    <section class="card span-7">
+      <div class="card-header"><div><div class="card-title">{% icon "download" %}리포트 업로드</div><div class="card-desc">CSV 또는 엑셀(.xlsx) · 열 이름을 자동으로 인식해요 · 같은 기간을 다시 올리면 덮어써요</div></div></div>
+      <div class="card-body">
+        <form class="upload" method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <label class="dropzone" data-dropzone>
+            <input type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
+            <span class="dz-icon">{% icon "download" "i-lg" %}</span>
+            <span class="dz-title">파일을 끌어다 놓거나 클릭해서 선택</span>
+            <span class="dz-file subtle">비즈어드바이저 · 쿠팡 WING · 광고 리포트</span>
+          </label>
+          <div class="form-grid">
+            <div class="field">
+              <label for="store">스토어</label>
+              <select class="select" id="store" name="store" data-store-select>
+                {% for s in stores %}<option value="{{ s.id }}">{{ s.name }} · {{ s.get_marketplace_display }}</option>{% endfor %}
+                <option value="new" {% if not stores %}selected{% endif %}>+ 새 스토어</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="kind">리포트 종류</label>
+              <select class="select" id="kind" name="kind">
+                <option value="">자동 인식</option>
+                {% for value, label in kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field" data-new-store {% if stores %}hidden{% endif %}>
+              <label for="new_store">새 스토어 이름</label>
+              <input class="input" id="new_store" name="new_store" placeholder="예: 하늘상점">
+            </div>
+            <div class="field" data-new-store {% if stores %}hidden{% endif %}>
+              <label for="marketplace">마켓</label>
+              <select class="select" id="marketplace" name="marketplace">{% for value, label in marketplaces %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg" type="submit">{% icon "arrow-up" %}가져오기</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card span-5">
+      <div class="card-header"><div><div class="card-title">{% icon "list" %}인식하는 리포트</div><div class="card-desc">열 이름 예시 — 순서는 상관없어요</div></div></div>
+      <div class="card-body">
+        <dl class="specs-list">
+          <dt>판매 실적</dt><dd>날짜 · 상품명 · 결제수(주문수) · 결제상품수량 · 결제금액</dd>
+          <dt>방문 통계</dt><dd>날짜 · 유입수(방문수) · 페이지뷰</dd>
+          <dt>유입 키워드</dt><dd>날짜 · 키워드(검색어) · 유입수 · 결제수 · 결제금액</dd>
+          <dt>광고 성과</dt><dd>날짜 · 키워드 · 노출수 · 클릭수 · 광고비 · 전환수 · 전환매출</dd>
+        </dl>
+        <div class="callout callout-info" style="margin-top:16px">{% icon "info" %}<span>마켓 API 자동 연동(커머스API·쿠팡 WING)은 솔루션 등록 후 제공돼요. 지금은 리포트 파일이 가장 빠른 방법이에요.</span></div>
+      </div>
+    </section>
+
+    <section class="card span-12">
+      <div class="card-header"><div><div class="card-title">{% icon "store" %}연결된 스토어</div></div></div>
+      <div class="card-body flush">
+        {% if stores %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>스토어</th><th>마켓</th><th>출처</th><th class="num">상품</th><th></th></tr></thead>
+          <tbody>
+            {% for s in stores %}
+            <tr>
+              <td><b>{{ s.name }}</b></td>
+              <td><span class="market {{ s.marketplace }}">{{ s.get_marketplace_display }}</span></td>
+              <td>{% if s.source == "demo" %}<span class="badge badge-warning">데모</span>{% else %}<span class="badge">{{ s.get_source_display }}</span>{% endif %}</td>
+              <td class="num">{{ s.products.count }}</td>
+              <td class="num"><form method="post" action="{% url 'delete_store' s.id %}">{% csrf_token %}<button class="btn-icon sm" type="submit" data-confirm="삭제" aria-label="스토어 삭제">{% icon "trash-2" "i-sm" %}</button></form></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+        {% else %}
+        <div class="empty sm"><p>아직 연결된 스토어가 없어요. 첫 리포트를 올리면 스토어가 만들어져요.</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if imports %}
+    <section class="card span-12">
+      <div class="card-header"><div><div class="card-title">{% icon "history" %}가져오기 기록</div></div></div>
+      <div class="card-body flush">
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>파일</th><th>종류</th><th>스토어</th><th>기간</th><th class="num">행</th><th class="num">시각</th></tr></thead>
+          <tbody>
+            {% for i in imports %}
+            <tr><td>{{ i.filename }}</td><td>{{ i.get_kind_display }}</td><td>{{ i.store.name }}</td><td class="tnum">{{ i.first_date|date:"Y.m.d" }} – {{ i.last_date|date:"Y.m.d" }}</td><td class="num">{{ i.rows|comma }}</td><td class="num subtle">{{ i.created_at|reltime }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const select = document.querySelector("[data-store-select]");
+  const toggle = () => document.querySelectorAll("[data-new-store]").forEach((el) => { el.hidden = select.value !== "new"; });
+  select?.addEventListener("change", toggle);
+  const zone = document.querySelector("[data-dropzone]");
+  const input = zone?.querySelector("input");
+  input?.addEventListener("change", () => { zone.querySelector(".dz-file").textContent = input.files[0]?.name || ""; zone.classList.toggle("has-file", !!input.files.length); });
+  ["dragenter", "dragover"].forEach((e) => zone?.addEventListener(e, () => zone.classList.add("drag")));
+  ["dragleave", "drop"].forEach((e) => zone?.addEventListener(e, () => zone.classList.remove("drag")));
+})();
+</script>
+{% endblock %}

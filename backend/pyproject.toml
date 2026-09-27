@@ -9,6 +9,7 @@ dependencies = [
     "gunicorn>=23",
     "httpx>=0.28",
     "kiwipiepy>=0.20",
+    "openpyxl>=3.1",
     "pillow>=11",
     "playwright>=1.50",
     "psycopg[binary]>=3.2",

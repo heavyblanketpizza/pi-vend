@@ -28,10 +28,17 @@ Why the split: most of the product is data work (API signing, caching, Korean te
 
 ## The app
 
-- **Agent**: a streaming chat. Tool calls show up as a live activity list (검색량 조회, 상품명 점검, 상세페이지 렌더링…), rendered detail pages appear as preview cards, and conversations are grouped by date in the sidebar.
-- **키워드 리서치**: monthly volume with the PC/mobile split, listing count, competition ratio, a 12-month trend chart, sortable related keywords, price distribution, the words top listings use, their category share, and the top 10 listings.
-- **상품 초안**: card grid with render thumbnails. Each draft page has a live 상품명 check, tags and keywords, attributes, a phone-frame preview of the 상세페이지, and a zip download of every slice for the 스마트에디터.
-- Light and dark themes, a mobile layout, and Pretendard served locally. There's no frontend build step: Django templates, one CSS file with the design tokens, and a small amount of vanilla JS.
+A seller workspace, not a chat window. The agent sits in a drawer on every page and gets prompts from what you're looking at.
+
+- **대시보드**: the store's own numbers for 7/30/90 days against the previous period. Revenue as the hero figure with a daily chart (hover crosshair, table view), orders, AOV, conversion and ad ROAS tiles with sparklines, products by revenue with share and change, channel split, weekday pattern, inflow keywords cross-referenced with Naver search volume (capture share), ad ROAS by keyword, and a market-demand watch. A **다음 액션** column turns the numbers into rule-based insights ("광고 '여름원피스' ROAS 92%"), each with an "에이전트에게 맡기기" button.
+- **데이터 연결**: upload 스마트스토어 / 쿠팡 report exports (CSV in UTF-8 or CP949, or XLSX). Columns are recognized by Korean/English header synonyms, title rows are skipped, and re-importing a period replaces it. Four report kinds: 판매 실적, 방문 통계, 유입 키워드, 광고 성과.
+- **상품 초안**: listing drafts with a 상품명 check, phone-frame 상세페이지 preview, and zip download.
+- **키워드 리서치**: volume, competition, trend, related keywords, competitor prices and title words.
+- **에이전트**: full-page conversations, or the drawer. It can read the store numbers (`store_overview` tool) as well as research data.
+
+Two skins share the same markup: **네오브루탈** (default; paper and ink, pill controls, pastel bento tiles, hard shadows on interaction) and **기본** (neutral). Switch with the wand button in the sidebar footer. Both have light and dark themes and a mobile layout. Chart colors follow a colorblind-validated palette in both skins.
+
+To explore without real data, click "데모 데이터로 둘러보기" on the empty dashboard, or run `python manage.py seed_demo_store --user <name>`.
 
 ## Quick start (local)
 
@@ -116,9 +123,10 @@ backend/
   pivend/naver/        검색광고 + open API clients (signing, parsing)
   pivend/research/     keyword stats, related keywords, trends, competitor analysis, cache
   pivend/listings/     drafts, 상품명 checker, 상세페이지 spec + renderer + template
+  pivend/store/        store data: models, report importer, dashboard analytics, insights, demo generator
   pivend/assistant/    conversations, chat SSE proxy, /internal API for the agent
   pivend/web/          pages (login, research, drafts), SVG chart geometry, UI template tags
-  pivend/web/static/   app.css (design system), chat.js, app.js, icon sprite, Pretendard
+  pivend/web/static/   app.css (base design system), brutal.css (neobrutalist skin), chat.js, charts.js, app.js, icons, Pretendard
 agent/
   src/llm.ts           provider setup (cloud + llama.cpp / OpenAI-compatible)
   src/tools.ts         tool definitions (TypeBox schemas) → Django internal API
@@ -129,7 +137,7 @@ agent/
 
 ## Roadmap
 
-1. **Seller data uploads**: parse 비즈어드바이저 and 쿠팡 광고 report exports (CSV/XLSX), since no API provides traffic or conversion data.
+1. **Validate the importer against real exports**: header synonyms were written from integrator docs; adjust `pivend/store/importers.py` as real 비즈어드바이저 / WING files come in.
 2. **Store connections**: register as a Naver 커머스솔루션 and a Coupang 연동업체, sync products and orders (Celery beat), and publish approved drafts through the Commerce API and WING API.
 3. **Rank tracking** from shopping search snapshots, and keyword volume history.
 4. Image generation and background removal for product shots.

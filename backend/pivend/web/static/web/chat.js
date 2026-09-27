@@ -23,6 +23,7 @@
     return list.length > 2 ? `${list.slice(0, 2).join(", ")} 외 ${list.length - 2}개` : list.join(", ");
   };
   const TOOLS = {
+    store_overview: { label: "스토어 실적 확인", detail: (a) => `최근 ${a.days || 30}일` },
     keyword_stats: { label: "검색량 조회", detail: (a) => few(a.keywords) },
     related_keywords: { label: "연관 키워드 탐색", detail: (a) => a.seed },
     keyword_trend: { label: "검색 트렌드 분석", detail: (a) => few(a.keywords) },
@@ -385,7 +386,7 @@
     if (!response.ok) return false;
     const created = await response.json();
     sendUrl = created.send_url;
-    window.history.replaceState(null, "", created.url);
+    window.history.replaceState(null, "", document.body.classList.contains("embed") ? `${created.url}?embed=1` : created.url);
     addToSidebar(created.url, text.replace(/\s+/g, " ").slice(0, 60));
     return true;
   }

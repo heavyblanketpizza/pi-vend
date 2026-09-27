@@ -54,6 +54,8 @@ def compact(value):
         return value
     if abs(n) >= 100_000_000:
         return f"{n / 100_000_000:.1f}".rstrip("0").rstrip(".") + "억"
+    if abs(n) >= 1_000_000:
+        return f"{n / 10_000:,.0f}만"
     if abs(n) >= 10_000:
         return f"{n / 10_000:.1f}".rstrip("0").rstrip(".") + "만"
     return f"{n:,}"

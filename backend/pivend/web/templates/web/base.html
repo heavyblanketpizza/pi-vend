@@ -1,33 +1,36 @@
 {% load static ui %}<!doctype html>
-<html lang="ko">
+<html lang="ko" data-skin="brutal">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}Pi-Vend{% endblock %}</title>
-<script>try{var t=localStorage.getItem("pivend-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>try{var d=document.documentElement,t=localStorage.getItem("pivend-theme"),s=localStorage.getItem("pivend-skin");if(t==="light"||t==="dark")d.dataset.theme=t;if(s==="base"||s==="brutal")d.dataset.skin=s}catch(e){}</script>
 <link rel="preload" href="{% static 'web/fonts/PretendardVariable.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{% static 'web/app.css' %}">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238A8AF6'/%3E%3Cstop offset='1' stop-color='%234B4BC8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='28' height='28' rx='8' fill='url(%23g)'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M8.4 10.2h11.2'/%3E%3Cpath d='M11.6 10.2v8.6'/%3E%3Cpath d='M16.6 10.2v6.4c0 1.4.8 2.2 2.1 2.2h.5'/%3E%3C/g%3E%3C/svg%3E">
-<meta name="theme-color" content="#FAFAFB" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0D0D10" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="{% static 'web/brutal.css' %}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='%23111'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M8.4 10.2h11.2'/%3E%3Cpath d='M11.6 10.2v8.6'/%3E%3Cpath d='M16.6 10.2v6.4c0 1.4.8 2.2 2.1 2.2h.5'/%3E%3C/g%3E%3C/svg%3E">
+{% if embed %}<base target="_top">{% endif %}
 {% block head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% if embed %}embed {% endif %}{% block body_class %}{% endblock %}">
 {% block body %}
 {% with url_name=request.resolver_match.url_name %}
+{% if not embed %}
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="내비게이션">
-    <a class="brand" href="{% url 'chat' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span><span class="brand-tag">Seller AI</span></a>
-
-    <a class="new-chat" href="{% url 'chat' %}">{% icon "square-pen" %}새 대화</a>
+    <a class="brand" href="{% url 'dashboard' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span><span class="brand-tag">Seller OS</span></a>
 
     <nav class="nav">
-      <a class="nav-item" href="{% url 'chat' %}" {% if url_name == "chat" or url_name == "chat_conversation" %}aria-current="page"{% endif %}>{% icon "sparkles" %}에이전트</a>
-      <a class="nav-item" href="{% url 'research' %}" {% if url_name == "research" %}aria-current="page"{% endif %}>{% icon "chart-column" %}키워드 리서치</a>
+      <div class="nav-label">워크스페이스</div>
+      <a class="nav-item" href="{% url 'dashboard' %}" {% if url_name == "dashboard" %}aria-current="page"{% endif %}>{% icon "layout-grid" %}대시보드</a>
       <a class="nav-item" href="{% url 'drafts' %}" {% if url_name == "drafts" or url_name == "draft_detail" %}aria-current="page"{% endif %}>{% icon "package" %}상품 초안{% if shell_draft_count %}<span class="count tnum">{{ shell_draft_count }}</span>{% endif %}</a>
+      <a class="nav-item" href="{% url 'research' %}" {% if url_name == "research" %}aria-current="page"{% endif %}>{% icon "chart-column" %}키워드 리서치</a>
+      <a class="nav-item" href="{% url 'data_sources' %}" {% if url_name == "data_sources" %}aria-current="page"{% endif %}>{% icon "layers" %}데이터 연결</a>
+      <a class="nav-item" href="{% url 'chat' %}" {% if url_name == "chat" or url_name == "chat_conversation" %}aria-current="page"{% endif %}>{% icon "sparkles" %}에이전트</a>
     </nav>
 
     <div class="side-section">
+      <div class="nav-label">최근 대화</div>
       <div class="convos">
         {% for label, items in shell_conversations %}
         <div class="convo-group">
@@ -64,6 +67,7 @@
         <span class="avatar">{{ user.get_username|slice:":1"|upper }}</span>
         <span class="who">{{ user.get_username }}</span>
         <div class="actions">
+          <button class="btn-icon" type="button" data-skin-toggle aria-label="스킨 변경" title="스킨">{% icon "wand-sparkles" %}</button>
           <button class="btn-icon" type="button" data-theme-toggle aria-label="테마 변경" title="테마: 시스템">{% icon "monitor" %}</button>
           {% if user.is_staff %}<a class="btn-icon" href="{% url 'admin:index' %}" aria-label="관리자" title="관리자">{% icon "settings" %}</a>{% endif %}
           <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn-icon" type="submit" aria-label="로그아웃" title="로그아웃">{% icon "log-out" %}</button></form>
@@ -72,17 +76,43 @@
     </div>
   </aside>
   <div class="scrim" data-nav-close></div>
+{% endif %}
 
   <main class="main">
+    {% if not embed %}
     <div class="topbar">
       <button class="btn-icon" type="button" data-nav-open aria-label="메뉴 열기">{% icon "menu" "i-lg" %}</button>
-      <a class="brand" href="{% url 'chat' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span></a>
+      <a class="brand" href="{% url 'dashboard' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span></a>
       <span style="flex:1"></span>
-      <a class="btn-icon" href="{% url 'chat' %}" aria-label="새 대화">{% icon "square-pen" "i-lg" %}</a>
+      <button class="btn-icon" type="button" data-copilot aria-label="에이전트에게 묻기">{% icon "sparkles" "i-lg" %}</button>
     </div>
+    <div class="appbar">
+      <form class="quick-search" action="{% url 'research' %}" method="get" role="search">
+        {% icon "search" %}
+        <input name="q" placeholder="키워드 분석 — 예: 캠핑의자" autocomplete="off" aria-label="키워드 분석">
+        <kbd>/</kbd>
+      </form>
+      <span style="flex:1"></span>
+      <a class="appbar-link" href="{% url 'data_sources' %}">{% icon "download" "i-sm" %}리포트 업로드</a>
+      <button class="btn btn-ink" type="button" data-copilot>{% icon "sparkles" %}에이전트에게 묻기</button>
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
+
+{% if not embed %}
 </div>
+
+<aside class="copilot" id="copilot" aria-label="에이전트" hidden>
+  <header class="copilot-head">
+    <span class="copilot-title">{% brand_mark "copilot-mark" %}에이전트</span>
+    <span style="flex:1"></span>
+    <a class="btn-icon" href="{% url 'chat' %}" data-copilot-full title="전체 화면으로 열기" aria-label="전체 화면으로 열기">{% icon "external-link" %}</a>
+    <button class="btn-icon" type="button" data-copilot-close aria-label="닫기">{% icon "x" %}</button>
+  </header>
+  <iframe class="copilot-frame" title="에이전트 대화" data-src="{% url 'chat' %}?embed=1"></iframe>
+</aside>
+{% endif %}
 {% endwith %}
 {% endblock %}
 
@@ -93,6 +123,7 @@
 </div>
 <script>window.PIVEND = { sprite: "{% static 'web/icons.svg' %}" };</script>
 <script src="{% static 'web/app.js' %}" defer></script>
+<script src="{% static 'web/charts.js' %}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

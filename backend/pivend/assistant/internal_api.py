@@ -146,3 +146,13 @@ def draft_render(request, user, body, draft_id: int):
         raise DraftError("Draft has no detail_page spec yet; pass one in detail_page")
     render = render_detail_page(draft, spec)
     return {"draft_id": draft.id, "draft_url": draft.public_url, **render.as_dict()}
+
+
+@internal_endpoint()
+def store_overview(request, user, body):
+    from pivend.store.analytics import PERIODS, overview_for_agent
+
+    days = int(body.get("days") or 30)
+    if days not in PERIODS:
+        raise ValueError(f"days must be one of {', '.join(map(str, PERIODS))}")
+    return overview_for_agent(user, days)

@@ -24,10 +24,6 @@ from .charts import area_chart, price_positions
 RECENT_SEARCHES = 8
 
 
-def home(request):
-    return redirect("chat" if request.user.is_authenticated else "login")
-
-
 def _attempt(fn, *args, **kwargs):
     """Run a research call; return (result, error message)."""
     try:
@@ -190,3 +186,128 @@ def draft_download(request, draft_id: int):
     buffer.seek(0)
     name = f"{draft.product_name or 'draft'}-상세페이지.zip".replace("/", "-")
     return FileResponse(buffer, as_attachment=True, filename=name, content_type="application/zip")
+
+
+# ------------------------------------------------------------------ dashboard
+def _delta_class(delta, up_is_good=True):
+    if delta is None or delta == 0:
+        return "flat"
+    return "up" if (delta > 0) == up_is_good else "down"
+
+
+@login_required
+def dashboard(request):
+    from pivend.store import analytics
+    from pivend.store.insights import build_insights
+    from pivend.store.models import Store
+
+    from .charts import column_chart, line_chart, sparkline
+
+    try:
+        days = int(request.GET.get("days", 30))
+    except ValueError:
+        days = 30
+    store_id = request.GET.get("store") or None
+    store_id = int(store_id) if store_id and store_id.isdigit() else None
+    data = analytics.dashboard(request.user, days, store_id)
+    context = {"stores": Store.objects.filter(owner=request.user), "store_id": store_id, "days": days, "periods": analytics.PERIODS}
+    if data is None:
+        return render(request, "web/dashboard.html", context)
+
+    kpis = data["kpis"]
+    for k in kpis:
+        k["spark"] = sparkline(k["series"]) if k["series"] else None
+        k["trend"] = _delta_class(k["delta"])
+    for p in data["products"]:
+        p["spark"] = sparkline(p["series"], width=96, height=24)
+        p["trend"] = _delta_class(p["delta"])
+    daily = data["daily"]
+    chart = line_chart(
+        daily["days"],
+        [
+            {"name": "이번 기간", "values": daily["revenue"], "role": "primary"},
+            {"name": "직전 기간", "values": daily["revenue_prev"], "role": "compare"},
+        ],
+        height=330,
+    )
+    peak_weekday = max(data["weekday"], key=lambda w: w["value"])
+    weekday = column_chart(
+        [{"label": w["label"], "value": w["value"], "highlight": w is peak_weekday} for w in data["weekday"]]
+    )
+    ads = data["ads"]
+    if ads:
+        peak_spend = max((k["spend"] for k in ads["keywords"]), default=1) or 1
+        for k in ads["keywords"]:
+            k["bar"] = round(k["spend"] / peak_spend * 100, 1)
+    context.update(
+        data=data,
+        hero=kpis[0],
+        tiles=kpis[1:],
+        chart=chart,
+        chart_rows=list(zip(daily["days"], daily["revenue"], daily["revenue_prev"], daily["orders"])),
+        weekday=weekday,
+        insights=build_insights(data),
+    )
+    return render(request, "web/dashboard.html", context)
+
+
+@login_required
+@require_POST
+def demo_data(request):
+    from pivend.store.demo import create_demo
+
+    create_demo(request.user)
+    messages.success(request, "데모 스토어 데이터를 만들었어요. 실제 리포트를 올리면 함께 표시돼요.")
+    return redirect("dashboard")
+
+
+@login_required
+def data_sources(request):
+    from pivend.store.importers import ImportError_, import_report
+    from pivend.store.models import DataImport, Store
+
+    stores = Store.objects.filter(owner=request.user)
+    if request.method == "POST":
+        upload = request.FILES.get("file")
+        store_id = request.POST.get("store")
+        new_name = request.POST.get("new_store", "").strip()
+        marketplace = request.POST.get("marketplace", "naver")
+        if upload is None:
+            messages.error(request, "업로드할 파일을 선택해 주세요.")
+        elif upload.size > 20 * 1024 * 1024:
+            messages.error(request, "파일은 20MB까지 올릴 수 있어요.")
+        else:
+            if store_id == "new" or not stores.exists():
+                if not new_name:
+                    messages.error(request, "새 스토어 이름을 입력해 주세요.")
+                    return redirect("data_sources")
+                store, _ = Store.objects.get_or_create(owner=request.user, marketplace=marketplace, name=new_name[:100])
+            else:
+                store = get_object_or_404(Store, owner=request.user, id=store_id)
+            kind = request.POST.get("kind") or None
+            try:
+                result = import_report(store, upload.name, upload.read(), kind if kind in DataImport.Kind.values else None)
+                messages.success(
+                    request,
+                    f"{DataImport.Kind(result.kind).label} {result.rows:,}행을 가져왔어요 ({result.first_date} ~ {result.last_date}).",
+                )
+            except ImportError_ as exc:
+                messages.error(request, str(exc))
+        return redirect("data_sources")
+    imports = DataImport.objects.filter(store__owner=request.user).select_related("store")[:20]
+    return render(
+        request,
+        "web/data.html",
+        {"stores": stores, "imports": imports, "kinds": DataImport.Kind.choices, "marketplaces": ListingDraft._meta.get_field("marketplace").choices},
+    )
+
+
+@login_required
+@require_POST
+def delete_store(request, store_id: int):
+    from pivend.store.models import Store
+
+    store = get_object_or_404(Store, owner=request.user, id=store_id)
+    store.delete()
+    messages.success(request, f"'{store.name}' 스토어와 데이터를 삭제했어요.")
+    return redirect("data_sources")
