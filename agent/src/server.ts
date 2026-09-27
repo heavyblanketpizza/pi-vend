@@ -53,6 +53,7 @@ export function createApp({ token, deps }: AppOptions): Server {
 				ok: true,
 				provider: deps.model.provider,
 				model: deps.model.id,
+				name: deps.model.name,
 				thinking: deps.thinkingLevel,
 			});
 		}

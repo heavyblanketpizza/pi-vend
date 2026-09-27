@@ -26,6 +26,13 @@ Browser ── Django (Python) ─────────────── Pos
 
 Why the split: most of the product is data work (API signing, caching, Korean text processing, rendering), which Python handles well. Pi is TypeScript, so the agent loop runs as a small Node service. Its tools are thin wrappers over Django endpoints, and it never holds marketplace credentials.
 
+## The app
+
+- **Agent**: a streaming chat. Tool calls show up as a live activity list (검색량 조회, 상품명 점검, 상세페이지 렌더링…), rendered detail pages appear as preview cards, and conversations are grouped by date in the sidebar.
+- **키워드 리서치**: monthly volume with the PC/mobile split, listing count, competition ratio, a 12-month trend chart, sortable related keywords, price distribution, the words top listings use, their category share, and the top 10 listings.
+- **상품 초안**: card grid with render thumbnails. Each draft page has a live 상품명 check, tags and keywords, attributes, a phone-frame preview of the 상세페이지, and a zip download of every slice for the 스마트에디터.
+- Light and dark themes, a mobile layout, and Pretendard served locally. There's no frontend build step: Django templates, one CSS file with the design tokens, and a small amount of vanilla JS.
+
 ## Quick start (local)
 
 Requirements: Python 3.11+ with [uv](https://docs.astral.sh/uv/), Node.js 22.19+.
@@ -110,7 +117,8 @@ backend/
   pivend/research/     keyword stats, related keywords, trends, competitor analysis, cache
   pivend/listings/     drafts, 상품명 checker, 상세페이지 spec + renderer + template
   pivend/assistant/    conversations, chat SSE proxy, /internal API for the agent
-  pivend/web/          pages: login, research, drafts
+  pivend/web/          pages (login, research, drafts), SVG chart geometry, UI template tags
+  pivend/web/static/   app.css (design system), chat.js, app.js, icon sprite, Pretendard
 agent/
   src/llm.ts           provider setup (cloud + llama.cpp / OpenAI-compatible)
   src/tools.ts         tool definitions (TypeBox schemas) → Django internal API
@@ -126,4 +134,4 @@ agent/
 3. **Rank tracking** from shopping search snapshots, and keyword volume history.
 4. Image generation and background removal for product shots.
 
-The chat UI bundles [marked](https://github.com/markedjs/marked) (MIT) and [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0 / MPL-2.0).
+Bundled third-party assets: [Pretendard](https://github.com/orioncactus/pretendard) (OFL-1.1), icons from [Lucide](https://lucide.dev) (ISC), [marked](https://github.com/markedjs/marked) (MIT) and [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0 / MPL-2.0).

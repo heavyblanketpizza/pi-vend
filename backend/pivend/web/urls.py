@@ -12,4 +12,5 @@ urlpatterns = [
     path("drafts/<int:draft_id>/", views.draft_detail, name="draft_detail"),
     path("drafts/<int:draft_id>/render/", views.draft_render, name="draft_render"),
     path("drafts/<int:draft_id>/approve/", views.draft_approve, name="draft_approve"),
+    path("drafts/<int:draft_id>/download/", views.draft_download, name="draft_download"),
 ]

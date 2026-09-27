@@ -58,6 +58,9 @@ def internal_endpoint(methods: tuple[str, ...] = ("POST",)):
                 return JsonResponse({"error": "invalid detail page spec", "details": exc.errors}, status=400)
             except (DraftError, ValueError, TypeError) as exc:
                 return JsonResponse({"error": str(exc)}, status=400)
+            except Exception:
+                logger.exception("Internal API %s failed", request.path)
+                return JsonResponse({"error": "internal error; see server logs", "code": "internal"}, status=500)
 
         return wrapper
 

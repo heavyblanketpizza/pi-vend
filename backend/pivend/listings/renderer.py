@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.template.loader import render_to_string
 from django.utils import timezone
 from PIL import Image
@@ -18,6 +19,12 @@ from .detailpage import validate_spec
 from .models import DetailPageRender, ListingDraft
 
 logger = logging.getLogger(__name__)
+
+# Bundled assets are served to the headless page from this fake origin, so
+# renders never depend on a CDN (and look identical in Docker and offline).
+FONT_HOST = "https://assets.pivend.internal"
+FONT_FILE = "web/fonts/PretendardVariable.woff2"
+FONT_PATH = "/fonts/PretendardVariable.woff2"
 
 
 def _is_public_host(host: str) -> bool:
@@ -48,10 +55,27 @@ def _guard_request(route) -> None:
         route.abort()
 
 
+def _serve_asset(route) -> None:
+    path = urlparse(route.request.url).path
+    local = finders.find(FONT_FILE) if path == FONT_PATH else None
+    if not local:
+        route.abort()
+        return
+    route.fulfill(
+        path=local,
+        headers={"Content-Type": "font/woff2", "Access-Control-Allow-Origin": "*"},
+    )
+
+
 def render_html(spec: dict) -> str:
     return render_to_string(
         "listings/detail_page.html",
-        {"spec": spec, "theme": spec["theme"], "width": settings.DETAIL_PAGE_WIDTH},
+        {
+            "spec": spec,
+            "theme": spec["theme"],
+            "width": settings.DETAIL_PAGE_WIDTH,
+            "font_url": f"{FONT_HOST}{FONT_PATH}",
+        },
     )
 
 
@@ -71,6 +95,8 @@ def screenshot_html(html: str) -> bytes:
                 device_scale_factor=1,
             )
             page.route("**/*", _guard_request)
+            # Registered last so it runs first for its URLs.
+            page.route(f"{FONT_HOST}/**", _serve_asset)
             page.set_content(html, wait_until="load", timeout=30_000)
             try:
                 page.wait_for_load_state("networkidle", timeout=10_000)

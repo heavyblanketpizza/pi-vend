@@ -127,9 +127,12 @@ class SearchAdClient:
 
         params = {"hintKeywords": ",".join(hints), "showDetail": "1"}
         for attempt in range(3):
-            response = self.http.get(
-                KEYWORDSTOOL_URI, params=params, headers=self._headers("GET", KEYWORDSTOOL_URI)
-            )
+            try:
+                response = self.http.get(
+                    KEYWORDSTOOL_URI, params=params, headers=self._headers("GET", KEYWORDSTOOL_URI)
+                )
+            except httpx.HTTPError as exc:
+                raise NaverAPIError(f"keywordstool request failed: {exc}") from exc
             if response.status_code == 429 and attempt < 2:
                 time.sleep(1.0 * (attempt + 1))
                 continue

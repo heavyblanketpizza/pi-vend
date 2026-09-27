@@ -39,14 +39,14 @@ def check_title(
 
     length = len(title)
     if length == 0:
-        issue("error", "empty", "Title is empty.")
+        issue("error", "empty", "상품명이 비어 있어요.")
     elif length > HARD_LIMIT:
-        issue("error", "too_long", f"{length} characters; the limit is {HARD_LIMIT}.")
+        issue("error", "too_long", f"{length}자예요. 최대 {HARD_LIMIT}자까지 입력할 수 있어요.")
     elif length > RECOMMENDED_MAX:
         issue(
             "warning",
             "long",
-            f"{length} characters. Titles over ~{RECOMMENDED_MAX} dilute keyword relevance.",
+            f"{length}자예요. {RECOMMENDED_MAX}자를 넘으면 키워드 적합도가 분산될 수 있어요.",
         )
 
     tokens = title_tokens(title)
@@ -55,7 +55,7 @@ def check_title(
         issue(
             "warning",
             "repeated_words",
-            f"Repeated words: {', '.join(repeats)}. Repeating keywords reads as stuffing and can be penalized.",
+            f"반복된 단어: {', '.join(repeats)}. 같은 키워드를 반복하면 어뷰징으로 보일 수 있어요.",
         )
 
     lowered = title.lower()
@@ -68,31 +68,31 @@ def check_title(
         issue(
             "warning",
             "promo_terms",
-            f"Promotional terms: {', '.join(promos)}. Shipping/discount/event wording belongs in other fields, not the 상품명.",
+            f"홍보 문구: {', '.join(promos)}. 배송·할인·이벤트 정보는 상품명이 아닌 다른 항목에 넣으세요.",
         )
 
     decorative = sorted(set(DECORATIVE_RE.findall(title)))
     if decorative:
-        issue("warning", "decorative_symbols", f"Decorative symbols: {' '.join(decorative)}.")
+        issue("warning", "decorative_symbols", f"장식용 특수문자: {' '.join(decorative)}. 검색 품질을 떨어뜨릴 수 있어요.")
 
     compact = normalize_keyword(title)
     missing = [k for k in (target_keywords or []) if normalize_keyword(k) not in compact]
     covered = [k for k in (target_keywords or []) if k not in missing]
     if missing:
-        issue("info", "missing_keywords", f"Target keywords not in the title: {', '.join(missing)}.")
+        issue("info", "missing_keywords", f"상품명에 없는 타깃 키워드: {', '.join(missing)}.")
 
     if brand:
         position = compact.find(normalize_keyword(brand))
         if position == -1:
-            issue("info", "brand_missing", f"Brand '{brand}' is not in the title.")
+            issue("info", "brand_missing", f"브랜드 '{brand}'가 상품명에 없어요.")
         elif position > 0:
-            issue("info", "brand_not_first", f"Brand '{brand}' usually leads the title (brand + product + attributes).")
+            issue("info", "brand_not_first", f"브랜드 '{brand}'는 상품명 맨 앞에 두는 게 일반적이에요 (브랜드 + 상품 + 속성).")
 
     if marketplace == "coupang" and length and not brand:
         issue(
             "info",
             "coupang_brand",
-            "Coupang requires brand information on listings; pass the brand to check its placement.",
+            "쿠팡은 브랜드 정보가 필수예요. 브랜드를 함께 넘기면 위치까지 점검해요.",
         )
 
     return {
@@ -104,5 +104,5 @@ def check_title(
         "keywords_missing": missing,
         "ok": not any(i["level"] == "error" for i in issues),
         "issues": issues,
-        "note": "Heuristic check based on common seller guidance, not an official marketplace validator.",
+        "note": "마켓 공식 검증기가 아니라 셀러 가이드에 기반한 휴리스틱 점검이에요.",
     }

@@ -87,7 +87,7 @@ export function localModel(config: LlmConfig, id: string, baseUrl: string): Mode
 	}
 	return {
 		id,
-		name: `${id} (${config.provider})`,
+		name: id,
 		api: "openai-completions",
 		provider: config.provider,
 		baseUrl,

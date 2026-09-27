@@ -18,6 +18,10 @@ jobs:
       - run: uv run python manage.py makemigrations --check --dry-run
         env:
           DJANGO_SECRET_KEY: ci
+      - run: uv run python manage.py collectstatic --noinput
+        env:
+          DJANGO_SECRET_KEY: ci
+          DJANGO_STATIC_ROOT: /tmp/static
       - run: uv run pytest -q
 
   agent:

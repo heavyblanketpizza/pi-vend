@@ -99,3 +99,29 @@ def _png(width, height):
     buffer = io.BytesIO()
     Image.new("RGB", (width, height), "white").save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def test_unexpected_errors_return_json(client, user, monkeypatch):
+    from pivend.research import services
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(services, "get_keyword_stats", boom)
+    response = call(client, user, "research/keyword-stats", {"keywords": ["원피스"]})
+    assert response.status_code == 500
+    assert response["Content-Type"] == "application/json"
+    assert response.json()["code"] == "internal"
+
+
+def test_upstream_errors_return_502(client, user, monkeypatch):
+    from pivend.naver.errors import NaverAPIError
+    from pivend.research import services
+
+    def fail(*args, **kwargs):
+        raise NaverAPIError("shopping search request failed: 403 Forbidden")
+
+    monkeypatch.setattr(services, "get_keyword_stats", fail)
+    response = call(client, user, "research/keyword-stats", {"keywords": ["원피스"]})
+    assert response.status_code == 502
+    assert response.json()["code"] == "upstream"

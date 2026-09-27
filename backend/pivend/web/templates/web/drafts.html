@@ -1,23 +1,51 @@
 {% extends "web/base.html" %}
+{% load ui %}
 {% block title %}상품 초안 · Pi-Vend{% endblock %}
 {% block content %}
-<h1>상품 초안</h1>
-{% if drafts %}
-<div class="panel table-wrap">
-  <table>
-    <tr><th>상품</th><th>상품명</th><th>마켓</th><th>상태</th><th>수정일</th></tr>
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">상품 초안</h1>
+      <p class="page-subtitle">에이전트가 만든 상품명·태그·상세페이지를 검토하고 승인해요.</p>
+    </div>
+    <nav class="tabs" aria-label="상태 필터">
+      <a class="tab" href="?" {% if not status %}aria-current="page"{% endif %}>전체 <span class="n tnum">{{ counts.all }}</span></a>
+      <a class="tab" href="?status=draft" {% if status == "draft" %}aria-current="page"{% endif %}>검토 중 <span class="n tnum">{{ counts.draft }}</span></a>
+      <a class="tab" href="?status=approved" {% if status == "approved" %}aria-current="page"{% endif %}>승인됨 <span class="n tnum">{{ counts.approved }}</span></a>
+    </nav>
+  </header>
+
+  {% if drafts %}
+  <div class="draft-grid">
     {% for d in drafts %}
-    <tr>
-      <td><a href="{% url 'draft_detail' d.id %}">{{ d.product_name }}</a></td>
-      <td>{{ d.title|default:"—" }}</td>
-      <td>{{ d.get_marketplace_display }}</td>
-      <td>{{ d.get_status_display }}</td>
-      <td class="muted small">{{ d.updated_at|date:"Y-m-d H:i" }}</td>
-    </tr>
+    <a class="card draft-card" href="{% url 'draft_detail' d.id %}">
+      <div class="draft-thumb">
+        {% if d.cover %}<img src="{{ d.cover }}" alt="" loading="lazy">{% else %}<div class="placeholder">{% icon "image" %}</div>{% endif %}
+        {% if d.status == "approved" %}<span class="badge badge-success">{% icon "check" %}승인됨</span>{% else %}<span class="badge">검토 중</span>{% endif %}
+      </div>
+      <div class="draft-info">
+        <span class="market {{ d.marketplace }}">{{ d.get_marketplace_display }}</span>
+        <span class="name">{{ d.product_name }}</span>
+        <span class="title">{{ d.title|default:"상품명 미정" }}</span>
+        <div class="foot"><span>{% if d.tags %}태그 {{ d.tags|length }}개{% else %}태그 없음{% endif %}</span><span>{{ d.updated_at|reltime }}</span></div>
+      </div>
+    </a>
     {% endfor %}
-  </table>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="empty">
+      <div class="empty-icon">{% icon "package" %}</div>
+      {% if status %}
+      <h3>이 상태의 초안이 없어요</h3>
+      <p>다른 탭을 확인해 보세요.</p>
+      {% else %}
+      <h3>첫 상품 초안을 만들어 보세요</h3>
+      <p>에이전트에게 상품 정보를 알려주면 키워드를 조사해 상품명·태그·상세페이지를 초안으로 저장해요.</p>
+      <a class="btn btn-primary" href="{% url 'chat' %}">{% icon "sparkles" %}에이전트와 시작하기</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% else %}
-<div class="panel muted">아직 초안이 없습니다. <a href="{% url 'chat' %}">에이전트</a>에게 상품명과 상세페이지를 만들어 달라고 해보세요.</div>
-{% endif %}
 {% endblock %}

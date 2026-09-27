@@ -136,6 +136,13 @@ class NaverOpenAPIClient:
             "X-Naver-Client-Secret": self.client_secret,
         }
 
+    def _send(self, method: str, path: str, what: str, **kwargs) -> dict:
+        try:
+            response = self.http.request(method, path, headers=self._headers, **kwargs)
+        except httpx.HTTPError as exc:
+            raise NaverAPIError(f"{what} request failed: {exc}") from exc
+        return self._check(response, what)
+
     def _check(self, response: httpx.Response, what: str) -> dict:
         if response.status_code != 200:
             raise NaverAPIError(
@@ -157,10 +164,7 @@ class NaverOpenAPIClient:
             "start": max(1, min(start, 1000)),
             "sort": sort,
         }
-        data = self._check(
-            self.http.get("/v1/search/shop.json", params=params, headers=self._headers),
-            "shopping search",
-        )
+        data = self._send("GET", "/v1/search/shop.json", "shopping search", params=params)
         return ShoppingSearchResult(
             total=int(data.get("total", 0)),
             items=[ShoppingItem.from_api(item) for item in data.get("items", [])],
@@ -192,10 +196,7 @@ class NaverOpenAPIClient:
             body["gender"] = gender
         if ages:
             body["ages"] = ages
-        return self._check(
-            self.http.post("/v1/datalab/search", json=body, headers=self._headers),
-            "datalab search trend",
-        )
+        return self._send("POST", "/v1/datalab/search", "datalab search trend", json=body)
 
     def shopping_keyword_trend(
         self,
@@ -222,9 +223,6 @@ class NaverOpenAPIClient:
             body["gender"] = gender
         if ages:
             body["ages"] = ages
-        return self._check(
-            self.http.post(
-                "/v1/datalab/shopping/category/keywords", json=body, headers=self._headers
-            ),
-            "datalab shopping keyword trend",
+        return self._send(
+            "POST", "/v1/datalab/shopping/category/keywords", "datalab shopping keyword trend", json=body
         )

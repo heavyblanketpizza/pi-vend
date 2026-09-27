@@ -1,74 +1,98 @@
-<!doctype html>
+{% load static ui %}<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}Pi-Vend{% endblock %}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
-<style>
-  :root {
-    --bg: #FAFAF9; --panel: #FFFFFF; --text: #1C1917; --muted: #78716C; --line: #E7E5E4;
-    --accent: #0F766E; --accent-soft: #CCFBF1; --warn: #B45309; --warn-soft: #FEF3C7;
-    --error: #B91C1C; --error-soft: #FEE2E2; --code: #F5F5F4;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0C0A09; --panel: #1C1917; --text: #F5F5F4; --muted: #A8A29E; --line: #292524;
-      --accent: #2DD4BF; --accent-soft: #134E4A; --warn: #FBBF24; --warn-soft: #451A03;
-      --error: #F87171; --error-soft: #450A0A; --code: #292524;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; word-break: keep-all; }
-  a { color: var(--accent); }
-  header { display: flex; align-items: center; gap: 20px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
-  header .brand { font-weight: 800; color: var(--text); text-decoration: none; }
-  header nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
-  header nav a { color: var(--muted); text-decoration: none; }
-  header nav a.active { color: var(--text); font-weight: 700; }
-  header form { margin: 0; }
-  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 22px; margin: 0 0 16px; }
-  h2 { font-size: 17px; margin: 28px 0 10px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
-  .muted { color: var(--muted); }
-  .small { font-size: 13px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  input[type=text], input[type=password], textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; }
-  button, .button { display: inline-block; padding: 9px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
-  @media (prefers-color-scheme: dark) { button, .button { color: #042F2E; } }
-  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
-  button:disabled { opacity: .5; cursor: default; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--code); font-size: 12px; margin: 2px 4px 2px 0; }
-  .notice { padding: 10px 14px; border-radius: 8px; margin: 8px 0; }
-  .notice.error { background: var(--error-soft); color: var(--error); }
-  .notice.warning { background: var(--warn-soft); color: var(--warn); }
-  .notice.success, .notice.info { background: var(--accent-soft); color: var(--accent); }
-  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-  .table-wrap { overflow-x: auto; }
-</style>
+<script>try{var t=localStorage.getItem("pivend-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preload" href="{% static 'web/fonts/PretendardVariable.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% static 'web/app.css' %}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238A8AF6'/%3E%3Cstop offset='1' stop-color='%234B4BC8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='28' height='28' rx='8' fill='url(%23g)'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M8.4 10.2h11.2'/%3E%3Cpath d='M11.6 10.2v8.6'/%3E%3Cpath d='M16.6 10.2v6.4c0 1.4.8 2.2 2.1 2.2h.5'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="theme-color" content="#FAFAFB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D0D10" media="(prefers-color-scheme: dark)">
 {% block head %}{% endblock %}
 </head>
-<body>
-<header>
-  <a class="brand" href="{% url 'home' %}">Pi-Vend</a>
-  {% if user.is_authenticated %}
-  <nav>
-    <a href="{% url 'chat' %}" class="{% if request.resolver_match.url_name|slice:':4' == 'chat' %}active{% endif %}">에이전트</a>
-    <a href="{% url 'research' %}" class="{% if request.resolver_match.url_name == 'research' %}active{% endif %}">키워드 리서치</a>
-    <a href="{% url 'drafts' %}" class="{% if request.resolver_match.url_name|slice:':5' == 'draft' %}active{% endif %}">상품 초안</a>
-    {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
-  </nav>
-  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
-  {% endif %}
-</header>
-<main>
-  {% for message in messages %}<div class="notice {{ message.tags }}">{{ message }}</div>{% endfor %}
-  {% block content %}{% endblock %}
-</main>
+<body class="{% block body_class %}{% endblock %}">
+{% block body %}
+{% with url_name=request.resolver_match.url_name %}
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="내비게이션">
+    <a class="brand" href="{% url 'chat' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span><span class="brand-tag">Seller AI</span></a>
+
+    <a class="new-chat" href="{% url 'chat' %}">{% icon "square-pen" %}새 대화</a>
+
+    <nav class="nav">
+      <a class="nav-item" href="{% url 'chat' %}" {% if url_name == "chat" or url_name == "chat_conversation" %}aria-current="page"{% endif %}>{% icon "sparkles" %}에이전트</a>
+      <a class="nav-item" href="{% url 'research' %}" {% if url_name == "research" %}aria-current="page"{% endif %}>{% icon "chart-column" %}키워드 리서치</a>
+      <a class="nav-item" href="{% url 'drafts' %}" {% if url_name == "drafts" or url_name == "draft_detail" %}aria-current="page"{% endif %}>{% icon "package" %}상품 초안{% if shell_draft_count %}<span class="count tnum">{{ shell_draft_count }}</span>{% endif %}</a>
+    </nav>
+
+    <div class="side-section">
+      <div class="convos">
+        {% for label, items in shell_conversations %}
+        <div class="convo-group">
+          <div class="side-label">{{ label }}</div>
+          {% for c in items %}
+          <div class="convo" {% if current and c.id == current.id %}aria-current="page"{% endif %}>
+            <a href="{% url 'chat_conversation' c.id %}" title="{{ c.title }}">{{ c.title }}</a>
+            <form method="post" action="{% url 'chat_delete' c.id %}">{% csrf_token %}
+              <button class="btn-icon sm" type="submit" data-confirm="삭제" aria-label="대화 삭제">{% icon "trash-2" "i-sm" %}</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% empty %}
+        <div class="side-empty">아직 대화가 없어요</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="side-footer">
+      <div class="model-status" title="{% if agent.online %}{{ agent.provider }} · {{ agent.model }}{% else %}{{ agent.error }}{% endif %}">
+        <span class="status-dot {% if not agent.online %}off{% endif %}"></span>
+        <div style="min-width:0">
+          {% if agent.online %}
+          <div class="name">{{ agent.name|default:agent.model }}</div>
+          <div class="meta">{{ agent.provider }} · 연결됨</div>
+          {% else %}
+          <div class="name">에이전트 오프라인</div>
+          <div class="meta">agent 서비스를 시작하세요</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="user-row">
+        <span class="avatar">{{ user.get_username|slice:":1"|upper }}</span>
+        <span class="who">{{ user.get_username }}</span>
+        <div class="actions">
+          <button class="btn-icon" type="button" data-theme-toggle aria-label="테마 변경" title="테마: 시스템">{% icon "monitor" %}</button>
+          {% if user.is_staff %}<a class="btn-icon" href="{% url 'admin:index' %}" aria-label="관리자" title="관리자">{% icon "settings" %}</a>{% endif %}
+          <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn-icon" type="submit" aria-label="로그아웃" title="로그아웃">{% icon "log-out" %}</button></form>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="scrim" data-nav-close></div>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="btn-icon" type="button" data-nav-open aria-label="메뉴 열기">{% icon "menu" "i-lg" %}</button>
+      <a class="brand" href="{% url 'chat' %}">{% brand_mark %}<span class="brand-name">Pi-Vend</span></a>
+      <span style="flex:1"></span>
+      <a class="btn-icon" href="{% url 'chat' %}" aria-label="새 대화">{% icon "square-pen" "i-lg" %}</a>
+    </div>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endwith %}
+{% endblock %}
+
+<div class="toasts" aria-live="polite">
+  {% for message in messages %}
+  <div class="toast {{ message.tags }}">{% if message.tags == "error" %}{% icon "circle-alert" %}{% else %}{% icon "circle-check" %}{% endif %}<span>{{ message }}</span></div>
+  {% endfor %}
+</div>
+<script>window.PIVEND = { sprite: "{% static 'web/icons.svg' %}" };</script>
+<script src="{% static 'web/app.js' %}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -133,3 +133,13 @@ def test_clean_html_and_categories():
     assert resolve_category("50000008") == "50000008"
     with pytest.raises(ValueError):
         resolve_category("없는카테고리")
+
+
+@respx.mock
+def test_network_failures_become_naver_api_errors():
+    respx.get("https://api.searchad.naver.com/keywordstool").mock(side_effect=httpx.ConnectError("refused"))
+    respx.get("https://openapi.naver.com/v1/search/shop.json").mock(side_effect=httpx.ReadTimeout("slow"))
+    with pytest.raises(NaverAPIError, match="request failed"):
+        SearchAdClient(api_key="k", secret_key="s", customer_id="1").keywordstool(["원피스"])
+    with pytest.raises(NaverAPIError, match="request failed"):
+        NaverOpenAPIClient(client_id="i", client_secret="s").shopping_search("원피스")

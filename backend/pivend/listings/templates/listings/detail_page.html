@@ -2,8 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
+  /* Served from the app's bundled font by the renderer (see renderer.FONT_HOST). */
+  @font-face {
+    font-family: "Pretendard Variable";
+    font-weight: 45 920;
+    src: url("{{ font_url }}") format("woff2-variations");
+  }
   :root {
     --accent: {{ theme.accent }};
     --bg: {{ theme.background }};
@@ -16,7 +21,7 @@
   body {
     width: {{ width }}px;
     color: var(--text);
-    font-family: "Pretendard", "Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "WenQuanYi Zen Hei", sans-serif;
+    font-family: "Pretendard Variable", "Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "WenQuanYi Zen Hei", sans-serif;
     word-break: keep-all;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
