@@ -3,6 +3,7 @@ import io
 import pytest
 from PIL import Image
 
+from pivend.accounts.netguard import is_public_host
 from pivend.listings import renderer
 from pivend.listings.detailpage import SpecError, validate_spec
 from pivend.listings.titlecheck import check_title
@@ -86,7 +87,7 @@ def test_validate_spec_reports_every_problem():
     [("localhost", False), ("127.0.0.1", False), ("169.254.169.254", False), ("10.0.0.5", False), ("192.168.0.1", False), ("", False)],
 )
 def test_renderer_blocks_private_hosts(host, public):
-    assert renderer._is_public_host(host) is public
+    assert is_public_host(host) is public
 
 
 def test_slice_image_splits_long_pages():

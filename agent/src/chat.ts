@@ -28,6 +28,8 @@ export interface ChatDeps {
 	models: Models;
 	model: Model<Api>;
 	thinkingLevel: ThinkingLevel;
+	/** The user's key for this request; passed to the provider, never stored. */
+	apiKey?: string;
 	systemPrompt: string;
 	tools: (userId: number) => AgentTool<any, any>[];
 }
@@ -70,7 +72,7 @@ export async function runChat(
 			tools: deps.tools(request.userId),
 			messages: sanitizeHistory(request.messages),
 		},
-		streamFn: deps.models.streamSimple.bind(deps.models),
+		streamFn: (model, context, options) => deps.models.streamSimple(model, context, { ...options, apiKey: deps.apiKey }),
 		sessionId: request.conversationId,
 	});
 

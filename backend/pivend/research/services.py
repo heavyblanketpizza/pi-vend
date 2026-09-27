@@ -10,12 +10,14 @@ import hashlib
 import json
 import statistics
 from collections import Counter
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Callable
 
 from django.conf import settings
 from django.utils import timezone
 
+from pivend.naver.errors import OPENAPI_NOT_CONFIGURED, SEARCHAD_NOT_CONFIGURED, NaverNotConfigured
 from pivend.naver.openapi import NaverOpenAPIClient, resolve_category
 from pivend.naver.searchad import MAX_HINT_KEYWORDS, KeywordToolRow, SearchAdClient
 
@@ -26,13 +28,54 @@ MAX_KEYWORDS_PER_LOOKUP = 20
 MAX_TREND_KEYWORDS = 5
 
 
+@dataclass(frozen=True)
+class Account:
+    """Whose keys a lookup runs on, and whose cache it reads and fills.
+
+    Cached responses are kept per user: one user's API quota never serves
+    another user's lookups.
+    """
+
+    scope: str
+    searchad_keys: dict | None = None
+    openapi_keys: dict | None = None
+
+    @property
+    def has_searchad(self) -> bool:
+        return self.searchad_keys is not None
+
+    @property
+    def has_openapi(self) -> bool:
+        return self.openapi_keys is not None
+
+
+def scope_for(user) -> str:
+    return f"u{user.pk}"
+
+
+def account_for(user) -> Account:
+    from pivend.accounts.models import Credential
+    from pivend.accounts.services import naver_keys
+
+    return Account(
+        scope=scope_for(user),
+        searchad_keys=naver_keys(user, Credential.Kind.NAVER_SEARCHAD),
+        openapi_keys=naver_keys(user, Credential.Kind.NAVER_OPENAPI),
+    )
+
+
 # Client factories — tests replace these.
-def searchad_client() -> SearchAdClient:
-    return SearchAdClient()
+def searchad_client(account: Account) -> SearchAdClient:
+    if account.searchad_keys is None:
+        raise NaverNotConfigured(SEARCHAD_NOT_CONFIGURED)
+    keys = account.searchad_keys
+    return SearchAdClient(keys["api_key"], keys["secret_key"], keys["customer_id"])
 
 
-def openapi_client() -> NaverOpenAPIClient:
-    return NaverOpenAPIClient()
+def openapi_client(account: Account) -> NaverOpenAPIClient:
+    if account.openapi_keys is None:
+        raise NaverNotConfigured(OPENAPI_NOT_CONFIGURED)
+    return NaverOpenAPIClient(account.openapi_keys["client_id"], account.openapi_keys["client_secret"])
 
 
 def _cutoff():
@@ -43,13 +86,13 @@ def _cache_key(raw: str) -> str:
     return raw if len(raw) <= 200 else hashlib.sha256(raw.encode()).hexdigest()
 
 
-def cached(kind: str, raw_key: str, fetch: Callable[[], dict | list]) -> dict | list:
+def cached(account: Account, kind: str, raw_key: str, fetch: Callable[[], dict | list]) -> dict | list:
     key = _cache_key(raw_key)
-    entry = ApiCache.objects.filter(kind=kind, key=key, fetched_at__gte=_cutoff()).first()
+    entry = ApiCache.objects.filter(scope=account.scope, kind=kind, key=key, fetched_at__gte=_cutoff()).first()
     if entry is not None:
         return entry.payload
     payload = fetch()
-    ApiCache.objects.update_or_create(kind=kind, key=key, defaults={"payload": payload})
+    ApiCache.objects.update_or_create(scope=account.scope, kind=kind, key=key, defaults={"payload": payload})
     return payload
 
 
@@ -65,7 +108,7 @@ def _dedupe(items: list[str]) -> list[str]:
     return out
 
 
-def _upsert_rows(rows: list[KeywordToolRow]) -> None:
+def _upsert_rows(account: Account, rows: list[KeywordToolRow]) -> None:
     now = timezone.now()
     objs = {}
     for row in rows:
@@ -73,6 +116,7 @@ def _upsert_rows(rows: list[KeywordToolRow]) -> None:
         if not norm:
             continue
         objs[norm] = KeywordStat(
+            scope=account.scope,
             normalized=norm,
             keyword=row.keyword,
             pc_searches=row.pc_searches,
@@ -97,45 +141,46 @@ def _upsert_rows(rows: list[KeywordToolRow]) -> None:
     KeywordStat.objects.bulk_create(
         list(objs.values()),
         update_conflicts=True,
-        unique_fields=["normalized"],
+        unique_fields=["scope", "normalized"],
         update_fields=update_fields,
         batch_size=500,
     )
 
 
-def _fetch_keywordstool(hints: list[str]) -> list[str]:
+def _fetch_keywordstool(account: Account, hints: list[str]) -> list[str]:
     """Call the keyword tool and upsert everything it returns.
 
     Returns the normalized keywords in the order the API listed them.
     """
-    rows = searchad_client().keywordstool(hints)
-    _upsert_rows(rows)
+    rows = searchad_client(account).keywordstool(hints)
+    _upsert_rows(account, rows)
     return [normalize_keyword(r.keyword) for r in rows]
 
 
-def shopping_total(query: str) -> int:
+def shopping_total(account: Account, query: str) -> int:
     """Number of listings Naver Shopping returns for a query."""
     payload = cached(
+        account,
         "shop_total",
         query,
-        lambda: {"total": openapi_client().shopping_search(query, display=1).total},
+        lambda: {"total": openapi_client(account).shopping_search(query, display=1).total},
     )
     return int(payload["total"])
 
 
-def get_keyword_stats(keywords: list[str], with_competition: bool = False) -> dict:
+def get_keyword_stats(account: Account, keywords: list[str], with_competition: bool = False) -> dict:
     keywords = _dedupe(keywords)[:MAX_KEYWORDS_PER_LOOKUP]
     norms = {k: normalize_keyword(k) for k in keywords}
 
     fresh = set(
-        KeywordStat.objects.filter(normalized__in=norms.values(), fetched_at__gte=_cutoff())
+        KeywordStat.objects.filter(scope=account.scope, normalized__in=norms.values(), fetched_at__gte=_cutoff())
         .values_list("normalized", flat=True)
     )
     missing = [k for k in keywords if norms[k] not in fresh]
     for i in range(0, len(missing), MAX_HINT_KEYWORDS):
-        _fetch_keywordstool(missing[i : i + MAX_HINT_KEYWORDS])
+        _fetch_keywordstool(account, missing[i : i + MAX_HINT_KEYWORDS])
 
-    stats = {s.normalized: s for s in KeywordStat.objects.filter(normalized__in=norms.values())}
+    stats = {s.normalized: s for s in KeywordStat.objects.filter(scope=account.scope, normalized__in=norms.values())}
     results = []
     for keyword in keywords:
         stat = stats.get(norms[keyword])
@@ -144,7 +189,7 @@ def get_keyword_stats(keywords: list[str], with_competition: bool = False) -> di
             continue
         row = {"query": keyword, "found": True, **stat.as_dict()}
         if with_competition:
-            products = shopping_total(keyword)
+            products = shopping_total(account, keyword)
             row["product_count"] = products
             # Listings per monthly search: lower means less crowded (경쟁강도).
             row["competition_ratio"] = round(products / max(stat.total_searches, 1), 2)
@@ -155,10 +200,10 @@ def get_keyword_stats(keywords: list[str], with_competition: bool = False) -> di
     }
 
 
-def get_related_keywords(seed: str, limit: int = 50, min_searches: int = 0) -> dict:
+def get_related_keywords(account: Account, seed: str, limit: int = 50, min_searches: int = 0) -> dict:
     seed = seed.strip()
-    related = cached("kwtool", normalize_keyword(seed), lambda: _fetch_keywordstool([seed]))
-    stats = {s.normalized: s for s in KeywordStat.objects.filter(normalized__in=related)}
+    related = cached(account, "kwtool", normalize_keyword(seed), lambda: _fetch_keywordstool(account, [seed]))
+    stats = {s.normalized: s for s in KeywordStat.objects.filter(scope=account.scope, normalized__in=related)}
     rows = [stats[n] for n in related if n in stats]
     rows = [s for s in rows if s.total_searches >= min_searches]
     rows.sort(key=lambda s: s.total_searches, reverse=True)
@@ -202,6 +247,7 @@ def _summarize_series(points: list[dict]) -> dict:
 
 
 def get_keyword_trend(
+    account: Account,
     keywords: list[str],
     months: int = 12,
     time_unit: str = "month",
@@ -227,7 +273,7 @@ def get_keyword_trend(
     raw_key = json.dumps(request, ensure_ascii=False, sort_keys=True)
 
     def fetch():
-        client = openapi_client()
+        client = openapi_client(account)
         if category:
             return client.shopping_keyword_trend(
                 category, keywords, start.isoformat(), end.isoformat(), time_unit,
@@ -238,7 +284,7 @@ def get_keyword_trend(
             device=device, gender=gender, ages=ages,
         )
 
-    data = cached("trend", raw_key, fetch)
+    data = cached(account, "trend", raw_key, fetch)
     series = []
     for result in data.get("results", []):
         points = [{"period": p["period"], "ratio": p["ratio"]} for p in result.get("data", [])]
@@ -271,13 +317,14 @@ def _quantiles(values: list[int]) -> dict:
     }
 
 
-def analyze_competitors(query: str, sample: int = 40) -> dict:
+def analyze_competitors(account: Account, query: str, sample: int = 40) -> dict:
     sample = max(1, min(sample, 100))
     payload = cached(
+        account,
         "shop",
         f"{query}|{sample}",
         lambda: (lambda r: {"total": r.total, "items": [i.as_dict() for i in r.items]})(
-            openapi_client().shopping_search(query, display=sample)
+            openapi_client(account).shopping_search(query, display=sample)
         ),
     )
     items = payload["items"]

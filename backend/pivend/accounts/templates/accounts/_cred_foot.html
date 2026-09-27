@@ -1,0 +1,8 @@
+{% load ui %}
+{% if cred %}
+<div class="conn-meta">
+  <span>{% icon "key-round" "i-sm" %}{{ cred.hint|default:"키 없음" }}</span>
+  {% if cred.checked_at %}<span>{% icon "clock" "i-sm" %}{{ cred.checked_at|reltime }} 확인</span>{% endif %}
+  {% if cred.status_message %}<span class="conn-msg {% if cred.status == 'error' %}is-error{% endif %}">{{ cred.status_message }}</span>{% endif %}
+</div>
+{% endif %}

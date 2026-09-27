@@ -26,6 +26,8 @@
     {% endif %}
   </header>
 
+  {% if steps %}<div class="dash-setup">{% include "accounts/_setup_steps.html" %}</div>{% endif %}
+
   {% if not data %}
   <section class="onboard">
     <div class="onboard-copy">

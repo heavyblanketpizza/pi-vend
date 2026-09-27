@@ -3,6 +3,7 @@ import { after, before, test } from "node:test";
 import { createModels, fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { HttpBackend } from "../src/backend.ts";
 import { runChat, sanitizeHistory, type UiEvent } from "../src/chat.ts";
+import type { LlmConfig } from "../src/llm.ts";
 import { createApp } from "../src/server.ts";
 import { createTools } from "../src/tools.ts";
 import { listen, parseSse, startJsonServer } from "./helpers.ts";
@@ -105,10 +106,30 @@ test("history keeps only LLM messages", () => {
 	assert.deepEqual(history.map((m) => m.role), ["user"]);
 });
 
-test("HTTP API requires the token and streams SSE", async () => {
+test("HTTP API requires the token, takes model settings per request and streams SSE", async () => {
 	const { faux, deps } = fauxDeps();
-	faux.setResponses([fauxAssistantMessage([fauxText("안녕하세요!")])]);
-	const app = await listen(createApp({ token: TOKEN, deps }), {});
+	faux.setResponses([fauxAssistantMessage([fauxText("안녕하세요!")]), fauxAssistantMessage([fauxText("OK")])]);
+	const seen: LlmConfig[] = [];
+	const app = await listen(
+		createApp({
+			token: TOKEN,
+			systemPrompt: deps.systemPrompt,
+			tools: deps.tools,
+			resolveLlm: async (config) => {
+				seen.push(config);
+				return { models: deps.models, model: deps.model, thinkingLevel: "off", apiKey: config.apiKey };
+			},
+			catalog: () => ({ anthropic: ["claude-opus-5"] }),
+		}),
+		{},
+	);
+	const post = (path: string, body: unknown) =>
+		fetch(`${app.url}${path}`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+		});
+	const llm = { provider: "anthropic", model: "claude-opus-5", api_key: "sk-user-1" };
 	try {
 		const denied = await fetch(`${app.url}/health`);
 		assert.equal(denied.status, 401);
@@ -116,23 +137,30 @@ test("HTTP API requires the token and streams SSE", async () => {
 		const health = (await (await fetch(`${app.url}/health`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json()) as { ok: boolean };
 		assert.equal(health.ok, true);
 
-		const bad = await fetch(`${app.url}/v1/chat`, {
-			method: "POST",
-			headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-			body: JSON.stringify({ message: "hi" }),
-		});
+		const catalog = (await (await fetch(`${app.url}/v1/models`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json()) as any;
+		assert.deepEqual(catalog.providers.anthropic, ["claude-opus-5"]);
+
+		const noModel = await post("/v1/chat", { user_id: 1, message: "hi" });
+		assert.equal(noModel.status, 400);
+		assert.match(((await noModel.json()) as any).error, /API 연결/);
+
+		const badProvider = await post("/v1/chat", { user_id: 1, message: "hi", llm: { provider: "nope" } });
+		assert.equal(badProvider.status, 400);
+
+		const bad = await post("/v1/chat", { message: "hi", llm });
 		assert.equal(bad.status, 400);
 
-		const response = await fetch(`${app.url}/v1/chat`, {
-			method: "POST",
-			headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-			body: JSON.stringify({ user_id: 1, messages: [], message: "안녕" }),
-		});
+		const response = await post("/v1/chat", { user_id: 1, messages: [], message: "안녕", llm });
 		assert.equal(response.status, 200);
 		assert.match(response.headers.get("content-type") ?? "", /text\/event-stream/);
 		const events = parseSse(await response.text());
 		assert.equal(events.at(-1).type, "done");
 		assert.equal(events.at(-1).messages.length, 2);
+		assert.equal(seen.at(-1)?.apiKey, "sk-user-1");
+		assert.equal(seen.at(-1)?.model, "claude-opus-5");
+
+		const check = (await (await post("/v1/test", { llm })).json()) as any;
+		assert.equal(check.ok, true);
 	} finally {
 		await app.close();
 	}

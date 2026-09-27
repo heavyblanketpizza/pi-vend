@@ -8,12 +8,12 @@ import { createServer } from "node:http";
 import { after, before, test } from "node:test";
 import { HttpBackend } from "../src/backend.ts";
 import { runChat, type UiEvent } from "../src/chat.ts";
-import type { LlmConfig } from "../src/config.ts";
-import { setupLlm } from "../src/llm.ts";
+import { assertPublicUrl, isPublicAddress, type LlmConfig, LlmConfigError, parseLlmRequest, setupLlm } from "../src/llm.ts";
 import { createTools } from "../src/tools.ts";
 import { listen, startJsonServer } from "./helpers.ts";
 
 const completions: any[] = [];
+const authHeaders: (string | undefined)[] = [];
 let llama: Awaited<ReturnType<typeof listen<{}>>>;
 let backend: Awaited<ReturnType<typeof startJsonServer>>;
 
@@ -32,6 +32,7 @@ before(async () => {
 		for await (const c of req) chunks.push(c as Buffer);
 		const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
 		completions.push(body);
+		authHeaders.push(req.headers.authorization);
 
 		const frames =
 			completions.length === 1
@@ -57,16 +58,10 @@ after(async () => {
 });
 
 test("llama.cpp provider: discovers the model and completes a tool round-trip", async () => {
-	const config: LlmConfig = {
-		provider: "llamacpp",
-		baseUrl: `${llama.url}/v1`,
-		thinking: "off",
-		contextWindow: 32768,
-		maxTokens: 4096,
-		reasoning: false,
-		vision: false,
-	};
-	const llm = await setupLlm(config);
+	const config: LlmConfig = { ...parseLlmRequest({ provider: "llamacpp", base_url: `${llama.url}/v1`, api_key: "user-key" }), maxTokens: 4096 };
+	// The mock listens on 127.0.0.1: refused unless private URLs are allowed (self-hosting).
+	await assert.rejects(setupLlm(config), LlmConfigError);
+	const llm = await setupLlm(config, { allowPrivateUrls: true });
 	assert.equal(llm.model.id, "qwen3-test.gguf");
 
 	const http = new HttpBackend(backend.url, "t");
@@ -89,6 +84,7 @@ test("llama.cpp provider: discovers the model and completes a tool round-trip", 
 	assert.equal(first.max_completion_tokens, undefined);
 	assert.equal(first.store, undefined);
 	assert.equal(first.reasoning_effort, undefined);
+	assert.equal(authHeaders[0], "Bearer user-key");
 	assert.ok(first.tools.some((t: any) => t.function.name === "render_detail_page"));
 
 	// The streamed arguments were reassembled and sent to the backend.
@@ -101,4 +97,24 @@ test("llama.cpp provider: discovers the model and completes a tool round-trip", 
 
 	const text = events.filter((e) => e.type === "text_delta").map((e) => (e as { delta: string }).delta).join("");
 	assert.equal(text, "제목이 좋습니다.");
+});
+
+test("private and internal addresses are refused for user LLM servers", async () => {
+	for (const address of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.0.10", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1"]) {
+		assert.equal(isPublicAddress(address), false, address);
+	}
+	assert.equal(isPublicAddress("8.8.8.8"), true);
+	assert.equal(isPublicAddress("2606:4700:4700::1111"), true);
+	await assert.rejects(assertPublicUrl("http://localhost:8080/v1"), LlmConfigError);
+	await assert.rejects(assertPublicUrl("http://[::1]:8080/v1"), LlmConfigError);
+	await assert.rejects(assertPublicUrl("ftp://example.com"), LlmConfigError);
+	await assertPublicUrl("https://8.8.8.8/v1");
+});
+
+test("cloud providers require the user's key", async () => {
+	await assert.rejects(setupLlm(parseLlmRequest({ provider: "anthropic" })), /API 키/);
+	const llm = await setupLlm(parseLlmRequest({ provider: "openai", api_key: "sk-x" }));
+	assert.equal(llm.model.id, "gpt-5.5");
+	assert.equal(llm.apiKey, "sk-x");
+	await assert.rejects(setupLlm(parseLlmRequest({ provider: "openai", api_key: "sk-x", model: "gpt-nope" })), /알 수 없는/);
 });

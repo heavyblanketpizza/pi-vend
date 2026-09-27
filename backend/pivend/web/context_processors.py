@@ -3,6 +3,7 @@
 from django.core.cache import cache
 from django.utils import timezone
 
+from pivend.accounts.services import llm_label
 from pivend.assistant.models import Conversation
 from pivend.assistant.views import agent_health
 from pivend.listings.models import ListingDraft
@@ -39,5 +40,25 @@ def shell(request):
     return {
         "shell_conversations": _group_conversations(conversations),
         "shell_draft_count": ListingDraft.objects.filter(owner=request.user).count(),
-        "agent": cached_agent_health(),
+        "agent": agent_state(request.user),
+    }
+
+
+def agent_state(user) -> dict:
+    """Whether this user can chat: the agent service is up and they've connected a model."""
+    service = cached_agent_health()
+    llm = llm_label(user)
+    if not service.get("online"):
+        state = "offline"
+    elif llm is None:
+        state = "no_model"
+    else:
+        state = "ready"
+    return {
+        "state": state,
+        "online": state == "ready",
+        "name": llm["model"] if llm else "",
+        "provider": llm["provider_label"] if llm else "",
+        "failing": bool(llm and llm["status"] == "error"),
+        "error": service.get("error", ""),
     }

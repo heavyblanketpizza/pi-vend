@@ -1,0 +1,9 @@
+{% extends "accounts/_auth.html" %}
+{% load ui %}
+{% block title %}가입 안내 · Pi-Vend{% endblock %}
+{% block card %}
+<div class="auth-icon">{% icon "lock" %}</div>
+<h2>지금은 초대로만 가입할 수 있어요</h2>
+<p class="sub">관리자에게 계정을 요청해 주세요.</p>
+<p class="auth-switch"><a href="{% url 'login' %}">로그인</a></p>
+{% endblock %}

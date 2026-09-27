@@ -13,6 +13,7 @@ from django.db.models import Max, Q, Sum
 
 from pivend.listings.models import ListingDraft
 from pivend.research.models import KeywordStat
+from pivend.research.services import scope_for
 from pivend.research.text import normalize_keyword
 
 from .models import AdDaily, DailySales, DailyTraffic, KeywordInflow, Store
@@ -139,7 +140,7 @@ def dashboard(owner, days: int = 30, store_id: int | None = None) -> dict | None
         "channels": _channels(totals, marketplace, start),
         "products": _products(sales, start, end, prev_start, cur_days),
         "weekday": _weekday(revenue, cur_days),
-        "keywords": _keywords(stores, start, end, days),
+        "keywords": _keywords(owner, stores, start, end, days),
         "ads": _ads(stores, start, end, ad_now),
         "market": _market(owner, stores, start, end),
         "units": units,
@@ -219,7 +220,7 @@ def _weekday(revenue: list[int], days: list[date]) -> list[dict]:
     ]
 
 
-def _keywords(stores, start, end, days) -> list[dict]:
+def _keywords(owner, stores, start, end, days) -> list[dict]:
     rows = (
         KeywordInflow.objects.filter(store__in=stores, date__range=(start, end))
         .values("keyword")
@@ -228,7 +229,9 @@ def _keywords(stores, start, end, days) -> list[dict]:
     )
     rows = list(rows)
     stats = {
-        s.normalized: s for s in KeywordStat.objects.filter(normalized__in=[normalize_keyword(r["keyword"]) for r in rows])
+        s.normalized: s for s in KeywordStat.objects.filter(
+            scope=scope_for(owner), normalized__in=[normalize_keyword(r["keyword"]) for r in rows]
+        )
     }
     peak = max((r["visits"] for r in rows), default=0) or 1
     out = []
@@ -280,7 +283,7 @@ def _market(owner, stores, start, end) -> list[dict]:
         if n and n not in seen:
             seen.add(n)
             ordered.append((k, n))
-    stats = {s.normalized: s for s in KeywordStat.objects.filter(normalized__in=[n for _, n in ordered])}
+    stats = {s.normalized: s for s in KeywordStat.objects.filter(scope=scope_for(owner), normalized__in=[n for _, n in ordered])}
     rows = [
         {"keyword": k, "volume": stats[n].total_searches, "mobile_share": round(stats[n].mobile_searches / stats[n].total_searches * 100) if stats[n].total_searches else 0,
          "competition": stats[n].competition, "fetched_at": stats[n].fetched_at}

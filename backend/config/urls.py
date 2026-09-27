@@ -7,6 +7,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("internal/", include("pivend.assistant.internal_urls")),
     path("chat/", include("pivend.assistant.urls")),
+    path("", include("pivend.accounts.urls")),
     path("", include("pivend.web.urls")),
 ]
 

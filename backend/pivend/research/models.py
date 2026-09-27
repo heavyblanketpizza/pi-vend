@@ -2,15 +2,16 @@ from django.db import models
 
 
 class ApiCache(models.Model):
-    """Raw API responses, cached to stay inside Naver's daily quotas."""
+    """Raw API responses, cached per user to stay inside Naver's daily quotas."""
 
+    scope = models.CharField(max_length=40, default="", db_index=True)
     kind = models.CharField(max_length=40)
     key = models.CharField(max_length=255)
     payload = models.JSONField()
     fetched_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["kind", "key"], name="unique_api_cache_entry")]
+        constraints = [models.UniqueConstraint(fields=["scope", "kind", "key"], name="unique_api_cache_entry")]
 
     def __str__(self):
         return f"{self.kind}:{self.key}"
@@ -20,10 +21,12 @@ class KeywordStat(models.Model):
     """Latest 검색광고 키워드도구 numbers for one keyword.
 
     Every keywordstool call returns hundreds of related keywords; they're all
-    upserted here so later lookups for any of them hit the cache.
+    upserted here so later lookups for any of them hit the cache. Rows are
+    kept per user (scope), like ApiCache.
     """
 
-    normalized = models.CharField(max_length=100, unique=True)
+    scope = models.CharField(max_length=40, default="")
+    normalized = models.CharField(max_length=100)
     keyword = models.CharField(max_length=100)
     pc_searches = models.PositiveIntegerField(default=0)
     mobile_searches = models.PositiveIntegerField(default=0)
@@ -39,6 +42,7 @@ class KeywordStat(models.Model):
 
     class Meta:
         ordering = ["-mobile_searches"]
+        constraints = [models.UniqueConstraint(fields=["scope", "normalized"], name="unique_keyword_stat")]
 
     def __str__(self):
         return self.keyword

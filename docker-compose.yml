@@ -1,6 +1,8 @@
 # docker compose up --build
-# Local LLM: put a GGUF file in ./models, set LLAMA_MODEL_FILE and
-# LLM_PROVIDER=llamacpp in .env, then: docker compose --profile local up --build
+# Self-hosted local LLM (single tenant): put a GGUF file in ./models, set
+# LLAMA_MODEL_FILE and ALLOW_PRIVATE_LLM_URLS=1 in .env, run
+#   docker compose --profile local up --build
+# and connect "llama.cpp 서버" with URL http://llamacpp:8080/v1 in 설정 > API 연결.
 services:
   db:
     image: postgres:17
@@ -25,6 +27,8 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1},web
       DJANGO_MEDIA_ROOT: /data/media
       PLAYWRIGHT_CHROMIUM_EXECUTABLE: ""
+      # Rate limits shared by all gunicorn workers.
+      CACHE_URL: ${CACHE_URL:-dbcache://pivend_cache}
     volumes:
       - media:/data/media
     ports:
@@ -38,10 +42,8 @@ services:
     env_file: .env
     environment:
       BACKEND_URL: http://web:8000
-    # Not published: only Django talks to the agent.
-    extra_hosts:
-      # Lets LLM_BASE_URL=http://host.docker.internal:8080/v1 reach a llama-server on the host.
-      - "host.docker.internal:host-gateway"
+    # Not published: only Django talks to the agent. It holds no keys of its own;
+    # each request carries the user's model settings.
     restart: unless-stopped
 
   llamacpp:

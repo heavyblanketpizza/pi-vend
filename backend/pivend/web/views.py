@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from pivend.accounts import ratelimit
 from pivend.listings.detailpage import SpecError
 from pivend.listings.models import ListingDraft
 from pivend.listings.renderer import render_detail_page
@@ -34,15 +35,6 @@ def _attempt(fn, *args, **kwargs):
         return None, str(exc)
 
 
-def _sources() -> dict:
-    return {
-        "searchad": all(
-            (settings.NAVER_SEARCHAD_API_KEY, settings.NAVER_SEARCHAD_SECRET_KEY, settings.NAVER_SEARCHAD_CUSTOMER_ID)
-        ),
-        "openapi": all((settings.NAVER_CLIENT_ID, settings.NAVER_CLIENT_SECRET)),
-    }
-
-
 def _remember(request, query: str) -> list[str]:
     recent = [q for q in request.session.get("recent_searches", []) if q != query]
     recent = [query, *recent][:RECENT_SEARCHES]
@@ -53,16 +45,19 @@ def _remember(request, query: str) -> list[str]:
 @login_required
 def keyword_research(request):
     query = " ".join(request.GET.get("q", "").split())[:50]
-    sources = _sources()
+    account = research.account_for(request.user)
+    sources = {"searchad": account.has_searchad, "openapi": account.has_openapi}
     context = {
         "query": query,
         "sources": sources,
         "recent": request.session.get("recent_searches", []),
     }
-    if query:
+    if query and (sources["searchad"] or sources["openapi"]) and not ratelimit.hit("research", request.user.pk):
+        context["rate_limited"] = True
+    elif query:
         context["recent"] = [q for q in _remember(request, query) if q != query]
         stats, context["stats_error"] = _attempt(
-            research.get_keyword_stats, [query], with_competition=sources["openapi"]
+            research.get_keyword_stats, account, [query], with_competition=sources["openapi"]
         )
         main = stats["keywords"][0] if stats and stats["keywords"] else None
         context["main"] = main if main and main.get("found") else None
@@ -72,7 +67,7 @@ def keyword_research(request):
             volume["pc_pct"] = 100 - volume["mobile_pct"]
         context["main_missing"] = bool(stats) and not context["main"]
 
-        related, context["related_error"] = _attempt(research.get_related_keywords, query, limit=40)
+        related, context["related_error"] = _attempt(research.get_related_keywords, account, query, limit=40)
         if related:
             top = max((k["total"] for k in related["keywords"]), default=0)
             for k in related["keywords"]:
@@ -80,7 +75,7 @@ def keyword_research(request):
                 k["mobile_share"] = round(k["mobile"] / k["total"] * 100) if k["total"] else 0
         context["related"] = related
 
-        competitors, context["competitors_error"] = _attempt(research.analyze_competitors, query, sample=40)
+        competitors, context["competitors_error"] = _attempt(research.analyze_competitors, account, query, sample=40)
         if competitors:
             sampled = competitors["sampled"] or 1
             top_share = max((t["share"] for t in competitors["top_tokens"]), default=1) or 1
@@ -91,7 +86,7 @@ def keyword_research(request):
             competitors["price_pos"] = price_positions(competitors["price"])
         context["competitors"] = competitors
 
-        trend, context["trend_error"] = _attempt(research.get_keyword_trend, [query], months=12)
+        trend, context["trend_error"] = _attempt(research.get_keyword_trend, account, [query], months=12)
         series = trend["series"][0] if trend and trend["series"] else None
         context["trend"] = series
         context["chart"] = area_chart(series["points"], trend["time_unit"]) if series else None
@@ -197,6 +192,7 @@ def _delta_class(delta, up_is_good=True):
 
 @login_required
 def dashboard(request):
+    from pivend.accounts.views import setup_steps
     from pivend.store import analytics
     from pivend.store.insights import build_insights
     from pivend.store.models import Store
@@ -211,6 +207,10 @@ def dashboard(request):
     store_id = int(store_id) if store_id and store_id.isdigit() else None
     data = analytics.dashboard(request.user, days, store_id)
     context = {"stores": Store.objects.filter(owner=request.user), "store_id": store_id, "days": days, "periods": analytics.PERIODS}
+    steps = setup_steps(request.user)
+    done = sum(s["done"] for s in steps)
+    if done < len(steps):
+        context.update(steps=steps, steps_done=done)
     if data is None:
         return render(request, "web/dashboard.html", context)
 

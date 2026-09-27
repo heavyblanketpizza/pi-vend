@@ -1,0 +1,20 @@
+{% load ui %}
+<section class="card setup-steps" aria-label="시작하기">
+  <div class="setup-steps-head">
+    <div>
+      <div class="card-title">{% icon "zap" %}시작하기</div>
+      <div class="card-desc">{{ steps_done }}/{{ steps|length }} 완료 · 내 키로 동작해요. 사용량은 각 서비스의 내 계정 한도로 계산돼요.</div>
+    </div>
+    <div class="setup-meter" role="progressbar" aria-valuemin="0" aria-valuemax="{{ steps|length }}" aria-valuenow="{{ steps_done }}"><span style="--done: {{ steps_done }}; --total: {{ steps|length }}"></span></div>
+  </div>
+  <ol class="setup-list">
+    {% for s in steps %}
+    <li class="{% if s.done %}is-done{% endif %}">
+      <a href="{{ s.url }}">
+        <span class="n">{% if s.done %}{% icon "check" "i-sm" %}{% else %}{{ forloop.counter }}{% endif %}</span>
+        <span class="t">{{ s.title }}<small>{{ s.desc }}</small></span>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+</section>

@@ -1,4 +1,4 @@
-"""Settings for pytest: fixed secrets, no Naver credentials, throwaway media dir."""
+"""Settings for pytest: fixed secrets, in-memory mail, throwaway media dir."""
 
 import os
 import tempfile
@@ -10,11 +10,9 @@ os.environ.update(
         "AGENT_URL": "http://agent.test",
         "PUBLIC_BASE_URL": "http://testserver",
         "DJANGO_MEDIA_ROOT": tempfile.mkdtemp(prefix="pivend-media-"),
-        "NAVER_SEARCHAD_API_KEY": "",
-        "NAVER_SEARCHAD_SECRET_KEY": "",
-        "NAVER_SEARCHAD_CUSTOMER_ID": "",
-        "NAVER_CLIENT_ID": "",
-        "NAVER_CLIENT_SECRET": "",
+        "CREDENTIAL_ENCRYPTION_KEYS": "dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC0=",
+        "ALLOW_PRIVATE_LLM_URLS": "0",
+        "EMAIL_URL": "memorymail://",
     }
 )
 os.environ.pop("DATABASE_URL", None)

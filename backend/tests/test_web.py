@@ -15,6 +15,7 @@ from pivend.listings.models import DetailPageRender, ListingDraft
 from pivend.web.charts import area_chart, monotone_path, price_positions
 from pivend.web.templatetags.ui import compact, month_label, reltime
 
+from .conftest import connect_llm, connect_naver
 from .test_research import FakeOpenAPI, FakeSearchAd
 
 
@@ -48,12 +49,22 @@ def test_send_message_streams_and_saves_transcript(client, seller):
         )
     )
     conversation = Conversation.objects.create(owner=seller)
+    connect_llm(seller)
 
     response = client.post(f"/chat/{conversation.id}/send/", data=json.dumps({"message": "안녕"}), content_type="application/json")
     body = b"".join(response.streaming_content).decode()
 
     sent = json.loads(route.calls.last.request.content)
-    assert sent == {"user_id": seller.id, "conversation_id": conversation.id, "messages": [], "message": "안녕"}
+    assert sent == {
+        "user_id": seller.id,
+        "conversation_id": conversation.id,
+        "messages": [],
+        "message": "안녕",
+        "llm": {
+            "provider": "anthropic", "model": "claude-opus-5", "base_url": None, "api_key": "sk-ant-user",
+            "reasoning": False, "thinking_format": None,
+        },
+    }
     assert route.calls.last.request.headers["Authorization"] == "Bearer test-token"
     assert '"text_delta"' in body
     assert '"done"' in body and "timestamp" not in body  # transcript isn't sent to the browser
@@ -67,9 +78,20 @@ def test_send_message_streams_and_saves_transcript(client, seller):
 def test_send_message_reports_agent_errors(client, seller):
     respx.post("http://agent.test/v1/chat").mock(side_effect=httpx.ConnectError("refused"))
     conversation = Conversation.objects.create(owner=seller)
+    connect_llm(seller)
     response = client.post(f"/chat/{conversation.id}/send/", data=json.dumps({"message": "hi"}), content_type="application/json")
     body = b"".join(response.streaming_content).decode()
     assert "에이전트에 연결할 수 없어요" in body
+
+
+@respx.mock
+def test_send_message_needs_a_connected_model(client, seller):
+    route = respx.post("http://agent.test/v1/chat")
+    conversation = Conversation.objects.create(owner=seller)
+    response = client.post(f"/chat/{conversation.id}/send/", data=json.dumps({"message": "hi"}), content_type="application/json")
+    body = b"".join(response.streaming_content).decode()
+    assert '"no_llm"' in body and "API 연결" in body
+    assert not route.called
 
 
 def test_display_messages_include_tool_outcomes():
@@ -134,10 +156,12 @@ def test_chat_page_shows_history_sidebar_and_prefill(client, seller, agent_statu
     old = Conversation.objects.create(owner=seller, title="지난 대화")
     Conversation.objects.filter(id=old.id).update(updated_at=timezone.now() - timedelta(days=10))
 
+    assert "AI 모델 미연결" in client.get("/chat/").content.decode()
+    connect_llm(seller)
     page = client.get("/chat/?prompt=상품명 추천").content.decode()
     assert "린넨 원피스 키워드" in page and "지난 대화" in page
     assert "오늘" in page and "이전" in page
-    assert "Claude Opus 5" in page
+    assert "claude-opus-5" in page
     assert "상품명 추천</textarea>" in page
 
     agent_status.clear()
@@ -155,17 +179,17 @@ def test_login_required_and_login_page(client, db):
 def test_research_without_keys_shows_setup(client, seller):
     page = client.get("/research/?q=원피스").content.decode()
     assert "네이버 데이터 연결이 필요해요" in page
-    assert "NAVER_SEARCHAD_API_KEY" in page
+    assert "/settings/" in page
 
 
 @pytest.mark.django_db
 def test_research_page_renders_all_sections(client, seller, settings, monkeypatch):
     from pivend.research import services
 
-    settings.NAVER_SEARCHAD_API_KEY = settings.NAVER_SEARCHAD_SECRET_KEY = settings.NAVER_SEARCHAD_CUSTOMER_ID = "x"
-    settings.NAVER_CLIENT_ID = settings.NAVER_CLIENT_SECRET = "x"
-    monkeypatch.setattr(services, "searchad_client", FakeSearchAd)
-    monkeypatch.setattr(services, "openapi_client", FakeOpenAPI)
+    connect_naver(seller)
+    used = []
+    monkeypatch.setattr(services, "searchad_client", lambda account: used.append(account) or FakeSearchAd())
+    monkeypatch.setattr(services, "openapi_client", lambda account: FakeOpenAPI())
 
     page = client.get("/research/?q=린넨 원피스").content.decode()
     assert "네이버 데이터 연결이 필요해요" not in page
@@ -179,6 +203,7 @@ def test_research_page_renders_all_sections(client, seller, settings, monkeypatc
     assert "에이전트에게 상품명 맡기기" in page
 
     assert client.session["recent_searches"] == ["린넨 원피스"]
+    assert used[0].scope == f"u{seller.id}" and used[0].searchad_keys["customer_id"] == "1234567"
 
 
 # ------------------------------------------------------------------- drafts

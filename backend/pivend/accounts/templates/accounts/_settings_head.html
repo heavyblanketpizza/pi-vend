@@ -1,0 +1,11 @@
+{% load ui %}
+<header class="page-header">
+  <div>
+    <div class="eyebrow">SETTINGS</div>
+    <h1 class="page-title">설정</h1>
+  </div>
+  <nav class="tabs" aria-label="설정">
+    <a class="tab" href="{% url 'connections' %}" {% if section == "connections" %}aria-current="page"{% endif %}>{% icon "plug" "i-sm" %}API 연결</a>
+    <a class="tab" href="{% url 'account' %}" {% if section == "account" %}aria-current="page"{% endif %}>{% icon "user" "i-sm" %}계정</a>
+  </nav>
+</header>

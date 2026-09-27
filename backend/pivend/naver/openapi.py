@@ -13,9 +13,8 @@ import re
 from dataclasses import dataclass
 
 import httpx
-from django.conf import settings
 
-from .errors import NaverAPIError, NaverNotConfigured
+from .errors import OPENAPI_NOT_CONFIGURED, NaverAPIError, NaverNotConfigured
 
 BASE_URL = "https://openapi.naver.com"
 
@@ -117,16 +116,14 @@ class ShoppingSearchResult:
 class NaverOpenAPIClient:
     def __init__(
         self,
-        client_id: str | None = None,
-        client_secret: str | None = None,
+        client_id: str,
+        client_secret: str,
         http: httpx.Client | None = None,
     ):
-        self.client_id = client_id if client_id is not None else settings.NAVER_CLIENT_ID
-        self.client_secret = client_secret if client_secret is not None else settings.NAVER_CLIENT_SECRET
+        self.client_id = client_id
+        self.client_secret = client_secret
         if not (self.client_id and self.client_secret):
-            raise NaverNotConfigured(
-                "Naver open API is not configured (NAVER_CLIENT_ID / NAVER_CLIENT_SECRET)."
-            )
+            raise NaverNotConfigured(OPENAPI_NOT_CONFIGURED)
         self.http = http or httpx.Client(base_url=BASE_URL, timeout=15.0)
 
     @property

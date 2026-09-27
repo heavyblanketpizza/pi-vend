@@ -111,7 +111,7 @@ def test_dashboard_compares_periods_and_resolves_store_rows(owner, store):
         _sales(store, dress, day, revenue)
         _sales(store, None, day, 999_999)  # store-level row is ignored when product rows exist
         _sales(coupang, None, day, 5_000)  # store with only store-level rows
-    KeywordStat.objects.create(normalized="린넨원피스", keyword="린넨원피스", pc_searches=1000, mobile_searches=9000)
+    KeywordStat.objects.create(scope=f"u{owner.id}", normalized="린넨원피스", keyword="린넨원피스", pc_searches=1000, mobile_searches=9000)
     KeywordInflow.objects.create(store=store, date=end, keyword="린넨 원피스", visits=70, orders=7, revenue=100)
     AdDaily.objects.create(store=store, date=end, keyword="린넨원피스", spend=100_000, revenue=90_000, clicks=200)
 

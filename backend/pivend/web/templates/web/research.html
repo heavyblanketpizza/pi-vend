@@ -34,17 +34,11 @@
     <div class="empty-icon">{% icon "key-round" %}</div>
     <div>
       <h3 style="font-size:16px;font-weight:650;letter-spacing:-0.01em">네이버 데이터 연결이 필요해요</h3>
-      <p class="muted" style="margin-top:4px">API 키를 <code>.env</code>에 넣고 서버를 다시 시작하면 검색량·상품수·트렌드가 채워져요. 키는 무료로 발급돼요.</p>
-      <div class="env-list">
-        {% if not sources.searchad %}
-        <div class="env"><span>NAVER_SEARCHAD_API_KEY · SECRET_KEY · CUSTOMER_ID</span><span class="desc">searchad.naver.com › 도구 › API 사용 관리</span><button class="btn-icon sm" type="button" data-copy="NAVER_SEARCHAD_API_KEY=
-NAVER_SEARCHAD_SECRET_KEY=
-NAVER_SEARCHAD_CUSTOMER_ID=" aria-label="복사">{% icon "copy" "i-sm" %}</button></div>
-        {% endif %}
-        {% if not sources.openapi %}
-        <div class="env"><span>NAVER_CLIENT_ID · NAVER_CLIENT_SECRET</span><span class="desc">developers.naver.com › 검색 + 데이터랩</span><button class="btn-icon sm" type="button" data-copy="NAVER_CLIENT_ID=
-NAVER_CLIENT_SECRET=" aria-label="복사">{% icon "copy" "i-sm" %}</button></div>
-        {% endif %}
+      <p class="muted" style="margin-top:4px">내 네이버 API 키를 연결하면 검색량·상품수·트렌드가 채워져요. 키는 무료로 발급되고, 암호화되어 저장돼요.</p>
+      <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+        {% if not sources.searchad %}<span class="badge badge-outline">검색광고 API 필요</span>{% endif %}
+        {% if not sources.openapi %}<span class="badge badge-outline">개발자센터 API 필요</span>{% endif %}
+        <a class="btn btn-primary btn-sm" href="{% url 'connections' %}">{% icon "key-round" %}API 연결하기</a>
       </div>
     </div>
   </div>
@@ -59,6 +53,7 @@ NAVER_CLIENT_SECRET=" aria-label="복사">{% icon "copy" "i-sm" %}</button></div
     <a class="btn btn-primary" href="{{ agent_url }}">{% icon "sparkles" %}에이전트에게 상품명 맡기기</a>
   </div>
 
+  {% if rate_limited %}<div class="callout callout-error">{% icon "circle-alert" %}<span>한 시간에 할 수 있는 조회 수를 넘었어요. 잠시 후 다시 시도해 주세요.</span></div>{% endif %}
   {% if stats_error %}<div class="callout callout-error">{% icon "circle-alert" %}<span>{{ stats_error }}</span></div>{% endif %}
   {% if main_missing %}<div class="callout callout-info">{% icon "info" %}<span>이 키워드는 검색광고 키워드도구에 데이터가 없어요. 띄어쓰기나 더 일반적인 표현으로 다시 찾아보세요.</span></div>{% endif %}
 

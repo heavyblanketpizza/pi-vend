@@ -42,7 +42,7 @@ def test_unconfigured_naver_api_returns_503(client, user):
     response = call(client, user, "research/keyword-stats", {"keywords": ["원피스"]})
     assert response.status_code == 503
     assert response.json()["code"] == "not_configured"
-    assert "NAVER_SEARCHAD" in response.json()["error"]
+    assert "API 연결" in response.json()["error"]
 
 
 def test_check_title(client, user):

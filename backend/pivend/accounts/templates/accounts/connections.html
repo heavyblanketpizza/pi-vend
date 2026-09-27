@@ -1,0 +1,166 @@
+{% extends "web/base.html" %}
+{% load static ui %}
+{% block title %}API 연결 · 설정 · Pi-Vend{% endblock %}
+{% block content %}
+<div class="page settings">
+  {% include "accounts/_settings_head.html" %}
+
+  {% if welcome %}
+  <div class="welcome-banner">
+    <div>
+      <div class="eyebrow">WELCOME</div>
+      <h2>가입을 환영해요! 이제 내 키를 연결해 볼까요?</h2>
+      <p>Pi-Vend는 내 API 키로 동작해요. 네이버 키는 무료로 발급되고, AI 모델은 쓴 만큼 각 서비스에 직접 요금이 나가요. 키는 암호화되어 저장되고 다시 화면에 보이지 않아요.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {% include "accounts/_setup_steps.html" %}
+
+  <div class="conn-grid">
+    <!-- AI model -->
+    <section class="card conn-card" id="llm">
+      <div class="conn-head">
+        <span class="conn-icon">{% icon "cpu" %}</span>
+        <div class="conn-title">
+          <h2>AI 모델</h2>
+          <p>에이전트가 생각하고 답하는 모델. 대화할 때마다 내 키로 호출돼요.</p>
+        </div>
+        {% include "accounts/_status.html" with cred=llm %}
+      </div>
+      <form class="conn-form" method="post" action="{% url 'save_connection' 'llm' %}" data-llm-form>
+        {% csrf_token %}
+        <fieldset class="provider-picker">
+          <legend class="sr-only">제공자</legend>
+          {% for p in providers %}
+          <label class="provider-opt">
+            <input type="radio" name="provider" value="{{ p.key }}" data-needs-key="{{ p.needs_key|yesno:'1,0' }}" data-needs-url="{{ p.needs_url|yesno:'1,0' }}" data-default-model="{{ p.default_model }}" data-key-url="{{ p.key_url }}" data-note="{{ p.note }}" {% if llm_config.provider == p.key or not llm_config.provider and forloop.first %}checked{% endif %}>
+            <span>{{ p.label }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+        <p class="field-help provider-note" data-provider-note></p>
+
+        <div class="conn-fields">
+          <div class="field" data-url-field>
+            <label for="llm-url">서버 주소</label>
+            <input class="input mono" id="llm-url" name="base_url" value="{{ llm_config.base_url|default:'' }}" placeholder="https://llm.example.com/v1" autocomplete="off" spellcheck="false">
+            <p class="field-help">{% if allow_private %}이 서버는 사설 주소도 허용하도록 설정돼 있어요 (자체 호스팅).{% else %}이 서비스에서 인터넷으로 접근할 수 있는 주소여야 해요. 내 PC의 localhost는 연결할 수 없어요.{% endif %}</p>
+          </div>
+          <div class="field">
+            <label for="llm-key">API 키 <span class="opt" data-key-optional>(선택)</span></label>
+            <input class="input mono" id="llm-key" name="api_key" type="password" autocomplete="off" spellcheck="false" placeholder="{% if llm.hint %}저장됨 {{ llm.hint }} — 바꿀 때만 입력{% else %}sk-...{% endif %}">
+            <p class="field-help" data-key-help></p>
+          </div>
+          <div class="field">
+            <label for="llm-model">모델</label>
+            <input class="input mono" id="llm-model" name="model" value="{{ llm_config.model|default:'' }}" autocomplete="off" spellcheck="false" list="">
+            {% for provider, ids in catalog.items %}<datalist id="models-{{ provider }}">{% for id in ids %}<option value="{{ id }}">{% endfor %}</datalist>{% endfor %}
+            <p class="field-help" data-model-help></p>
+          </div>
+          <label class="check" data-url-field>
+            <input type="checkbox" name="reasoning" {% if llm_config.reasoning %}checked{% endif %}>
+            <span>추론(thinking) 모델이에요 <small>Qwen3 등 — 생각 과정을 켜고 끌 수 있게 해요</small></span>
+          </label>
+        </div>
+        <div class="conn-actions">
+          <button class="btn btn-primary" type="submit">{% icon "shield-check" %}저장하고 테스트</button>
+          {% if llm %}
+          <button class="btn btn-secondary" type="submit" formaction="{% url 'test_connection' 'llm' %}" formnovalidate>{% icon "refresh-cw" %}다시 테스트</button>
+          <button class="btn btn-ghost danger" type="submit" formaction="{% url 'delete_connection' 'llm' %}" formnovalidate data-confirm="키를 삭제할까요?">{% icon "trash-2" %}삭제</button>
+          {% endif %}
+        </div>
+      </form>
+      {% include "accounts/_cred_foot.html" with cred=llm %}
+    </section>
+
+    <!-- Naver SearchAd -->
+    <section class="card conn-card" id="searchad">
+      <div class="conn-head">
+        <span class="conn-icon naver">N</span>
+        <div class="conn-title">
+          <h2>네이버 검색광고 API</h2>
+          <p>월간 검색수, 연관 키워드, 광고 경쟁도. 무료예요.</p>
+        </div>
+        {% include "accounts/_status.html" with cred=searchad %}
+      </div>
+      <details class="guide" {% if not searchad %}open{% endif %}>
+        <summary>키 발급 방법</summary>
+        <ol>
+          <li><a href="https://searchad.naver.com" target="_blank" rel="noopener">searchad.naver.com</a>에 로그인해요 (광고 계정이 없으면 무료로 만들 수 있어요).</li>
+          <li><b>도구 › API 사용 관리</b>에서 <b>네이버 검색광고 API 서비스 신청</b>을 눌러요.</li>
+          <li>표시되는 <b>액세스라이선스</b>, <b>비밀키</b>, <b>CUSTOMER_ID</b>를 아래에 붙여넣어요.</li>
+        </ol>
+      </details>
+      <form class="conn-form" method="post" action="{% url 'save_connection' 'searchad' %}">
+        {% csrf_token %}
+        <div class="conn-fields cols-3">
+          <div class="field"><label for="sa-key">액세스라이선스</label><input class="input mono" id="sa-key" name="api_key" type="password" autocomplete="off" spellcheck="false" placeholder="{% if searchad %}저장됨 — 바꿀 때만 입력{% endif %}" {% if not searchad %}required{% endif %}></div>
+          <div class="field"><label for="sa-secret">비밀키</label><input class="input mono" id="sa-secret" name="secret_key" type="password" autocomplete="off" spellcheck="false" placeholder="{% if searchad %}저장됨 — 바꿀 때만 입력{% endif %}" {% if not searchad %}required{% endif %}></div>
+          <div class="field"><label for="sa-cid">CUSTOMER_ID</label><input class="input mono" id="sa-cid" name="customer_id" type="password" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="{% if searchad %}저장됨 — 바꿀 때만 입력{% endif %}" {% if not searchad %}required{% endif %}></div>
+        </div>
+        <div class="conn-actions">
+          <button class="btn btn-primary" type="submit">{% icon "shield-check" %}저장하고 테스트</button>
+          {% if searchad %}
+          <button class="btn btn-secondary" type="submit" formaction="{% url 'test_connection' 'searchad' %}" formnovalidate>{% icon "refresh-cw" %}다시 테스트</button>
+          <button class="btn btn-ghost danger" type="submit" formaction="{% url 'delete_connection' 'searchad' %}" formnovalidate data-confirm="키를 삭제할까요?">{% icon "trash-2" %}삭제</button>
+          {% endif %}
+        </div>
+      </form>
+      {% include "accounts/_cred_foot.html" with cred=searchad %}
+    </section>
+
+    <!-- Naver Developers -->
+    <section class="card conn-card" id="openapi">
+      <div class="conn-head">
+        <span class="conn-icon naver">N</span>
+        <div class="conn-title">
+          <h2>네이버 개발자센터 API</h2>
+          <p>쇼핑 검색(상품 수·경쟁 상품)과 데이터랩 트렌드. 무료예요.</p>
+        </div>
+        {% include "accounts/_status.html" with cred=openapi %}
+      </div>
+      <details class="guide" {% if not openapi %}open{% endif %}>
+        <summary>키 발급 방법</summary>
+        <ol>
+          <li><a href="https://developers.naver.com/apps/#/register" target="_blank" rel="noopener">developers.naver.com › 애플리케이션 등록</a>으로 가요.</li>
+          <li>사용 API에 <b>검색</b>, <b>데이터랩(검색어트렌드)</b>, <b>데이터랩(쇼핑인사이트)</b>를 추가해요.</li>
+          <li>환경은 <b>WEB 설정</b>을 고르고 아무 URL이나 입력한 뒤 등록해요.</li>
+          <li><b>Client ID</b>와 <b>Client Secret</b>을 아래에 붙여넣어요.</li>
+        </ol>
+      </details>
+      <form class="conn-form" method="post" action="{% url 'save_connection' 'openapi' %}">
+        {% csrf_token %}
+        <div class="conn-fields cols-2">
+          <div class="field"><label for="oa-id">Client ID</label><input class="input mono" id="oa-id" name="client_id" type="password" autocomplete="off" spellcheck="false" placeholder="{% if openapi %}저장됨 — 바꿀 때만 입력{% endif %}" {% if not openapi %}required{% endif %}></div>
+          <div class="field"><label for="oa-secret">Client Secret</label><input class="input mono" id="oa-secret" name="client_secret" type="password" autocomplete="off" spellcheck="false" placeholder="{% if openapi %}저장됨 — 바꿀 때만 입력{% endif %}" {% if not openapi %}required{% endif %}></div>
+        </div>
+        <div class="conn-actions">
+          <button class="btn btn-primary" type="submit">{% icon "shield-check" %}저장하고 테스트</button>
+          {% if openapi %}
+          <button class="btn btn-secondary" type="submit" formaction="{% url 'test_connection' 'openapi' %}" formnovalidate>{% icon "refresh-cw" %}다시 테스트</button>
+          <button class="btn btn-ghost danger" type="submit" formaction="{% url 'delete_connection' 'openapi' %}" formnovalidate data-confirm="키를 삭제할까요?">{% icon "trash-2" %}삭제</button>
+          {% endif %}
+        </div>
+      </form>
+      {% include "accounts/_cred_foot.html" with cred=openapi %}
+    </section>
+
+    <!-- Coming soon -->
+    <section class="card conn-card is-soon">
+      <div class="conn-head">
+        <span class="conn-icon">{% icon "store" %}</span>
+        <div class="conn-title">
+          <h2>마켓 계정 연동</h2>
+          <p>네이버 커머스API·쿠팡 WING API로 주문·상품을 자동으로 가져오고, 승인한 초안을 바로 등록해요.</p>
+        </div>
+        <span class="badge badge-outline">준비 중</span>
+      </div>
+      <p class="soon-note">그때까지는 <a href="{% url 'data_sources' %}">데이터 연결</a>에서 리포트 파일을 올려 주세요.</p>
+    </section>
+  </div>
+
+  <p class="security-note">{% icon "lock" "i-sm" %}키는 서버에서 암호화해 저장하고, 저장한 뒤에는 다시 보여주지 않아요. AI 키는 대화할 때만 에이전트에 전달되고 저장되지 않아요.</p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'web/settings.js' %}" defer></script>{% endblock %}

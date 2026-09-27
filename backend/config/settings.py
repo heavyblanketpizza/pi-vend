@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "pivend.accounts",
     "pivend.naver",
     "pivend.research",
     "pivend.listings",
@@ -99,18 +100,50 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTHENTICATION_BACKENDS = ["pivend.accounts.backends.EmailBackend"]
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
+# --- Accounts -------------------------------------------------------------------
+# Anyone can create an account when true; otherwise only admins add users.
+SIGNUPS_OPEN = env.bool("SIGNUPS_OPEN", default=True)
+# New accounts must confirm their email address before they can log in.
+EMAIL_VERIFICATION = env.bool("EMAIL_VERIFICATION", default=True)
+# smtp+tls://user:password@smtp.example.com:587 — prints mail to the console by default.
+vars().update(env.email_url("EMAIL_URL", default="consolemail://"))
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Pi-Vend <no-reply@localhost>")
+# Password reset and verification links are valid this long.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
+
+# Users' API keys are encrypted with these Fernet keys (newest first). Generate one with
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Without keys (and DEBUG off) nothing can be saved; `manage.py check --deploy` reports it.
+CREDENTIAL_ENCRYPTION_KEYS = env.list("CREDENTIAL_ENCRYPTION_KEYS", default=[])
+if not CREDENTIAL_ENCRYPTION_KEYS and DEBUG:
+    import base64
+    import hashlib
+
+    # Local development only: derived from SECRET_KEY so the dev server just works.
+    CREDENTIAL_ENCRYPTION_KEYS = [base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest()).decode()]
+# Users may point the agent at their own LLM server. Private/internal addresses are
+# refused unless this is on (single-tenant self-hosting, e.g. http://llamacpp:8080/v1).
+ALLOW_PRIVATE_LLM_URLS = env.bool("ALLOW_PRIVATE_LLM_URLS", default=DEBUG)
+
+# Per-user request limits (count, seconds).
+RATE_LIMITS = {
+    "chat": (env.int("RATE_LIMIT_CHAT_PER_HOUR", default=60), 3600),
+    "research": (env.int("RATE_LIMIT_RESEARCH_PER_HOUR", default=120), 3600),
+    "credential_test": (20, 3600),
+    "signup": (10, 3600),
+    "email": (5, 3600),
+}
+# Set when a reverse proxy you control sets X-Forwarded-For (used for sign-up limits).
+TRUST_X_FORWARDED_FOR = env.bool("TRUST_X_FORWARDED_FOR", default=False)
+CACHES = {"default": env.cache_url("CACHE_URL", default="locmemcache://")}
+
 # --- Naver APIs ---------------------------------------------------------------
-# 검색광고 API (키워드도구): searchad.naver.com > 도구 > API 사용 관리
-NAVER_SEARCHAD_API_KEY = env("NAVER_SEARCHAD_API_KEY", default="")
-NAVER_SEARCHAD_SECRET_KEY = env("NAVER_SEARCHAD_SECRET_KEY", default="")
-NAVER_SEARCHAD_CUSTOMER_ID = env("NAVER_SEARCHAD_CUSTOMER_ID", default="")
-# Naver Developers open API app (검색 + 데이터랩): developers.naver.com
-NAVER_CLIENT_ID = env("NAVER_CLIENT_ID", default="")
-NAVER_CLIENT_SECRET = env("NAVER_CLIENT_SECRET", default="")
+# Each user connects their own keys (설정 > API 연결).
 # How long cached keyword/shopping lookups stay fresh.
 RESEARCH_CACHE_HOURS = env.int("RESEARCH_CACHE_HOURS", default=24)
 

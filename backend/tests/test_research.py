@@ -68,9 +68,12 @@ class FakeOpenAPI:
 @pytest.fixture
 def fakes(monkeypatch):
     searchad, openapi = FakeSearchAd(), FakeOpenAPI()
-    monkeypatch.setattr(services, "searchad_client", lambda: searchad)
-    monkeypatch.setattr(services, "openapi_client", lambda: openapi)
+    monkeypatch.setattr(services, "searchad_client", lambda account: searchad)
+    monkeypatch.setattr(services, "openapi_client", lambda account: openapi)
     return searchad, openapi
+
+
+ACCOUNT = services.Account(scope="u1")
 
 
 def test_normalize_keyword():
@@ -81,7 +84,7 @@ def test_normalize_keyword():
 @pytest.mark.django_db
 def test_keyword_stats_fetches_once_and_caches(fakes):
     searchad, openapi = fakes
-    result = services.get_keyword_stats(["린넨 원피스", "린넨원피스", "없는키워드"], with_competition=True)
+    result = services.get_keyword_stats(ACCOUNT, ["린넨 원피스", "린넨원피스", "없는키워드"], with_competition=True)
 
     assert searchad.calls == [["린넨 원피스", "없는키워드"]]  # duplicates collapse
     first, missing = result["keywords"]
@@ -92,22 +95,43 @@ def test_keyword_stats_fetches_once_and_caches(fakes):
     # Related keywords from the same call are cached too.
     assert KeywordStat.objects.filter(normalized="여름원피스").exists()
 
-    services.get_keyword_stats(["여름 원피스"])
+    services.get_keyword_stats(ACCOUNT, ["여름 원피스"])
     assert len(searchad.calls) == 1
+
+
+@pytest.mark.django_db
+def test_cache_is_kept_per_user(fakes):
+    searchad, openapi = fakes
+    other = services.Account(scope="u2")
+    services.get_keyword_stats(ACCOUNT, ["린넨원피스"])
+    services.analyze_competitors(ACCOUNT, "린넨 원피스", sample=3)
+    services.get_keyword_stats(other, ["린넨원피스"])
+    services.analyze_competitors(other, "린넨 원피스", sample=3)
+    assert len(searchad.calls) == 2 and len(openapi.searches) == 2  # no sharing across users
+    assert set(KeywordStat.objects.values_list("scope", flat=True)) == {"u1", "u2"}
+
+
+def test_missing_keys_raise_not_configured():
+    from pivend.naver.errors import NaverNotConfigured
+
+    with pytest.raises(NaverNotConfigured, match="API 연결"):
+        services.searchad_client(services.Account(scope="u1"))
+    with pytest.raises(NaverNotConfigured, match="API 연결"):
+        services.openapi_client(services.Account(scope="u1"))
 
 
 @pytest.mark.django_db
 def test_stale_stats_are_refetched(fakes, settings):
     searchad, _ = fakes
-    services.get_keyword_stats(["린넨원피스"])
+    services.get_keyword_stats(ACCOUNT, ["린넨원피스"])
     KeywordStat.objects.update(fetched_at=timezone.now() - timedelta(hours=settings.RESEARCH_CACHE_HOURS + 1))
-    services.get_keyword_stats(["린넨원피스"])
+    services.get_keyword_stats(ACCOUNT, ["린넨원피스"])
     assert len(searchad.calls) == 2
 
 
 @pytest.mark.django_db
 def test_related_keywords_sorted_and_filtered(fakes):
-    result = services.get_related_keywords("린넨 원피스", limit=10, min_searches=100)
+    result = services.get_related_keywords(ACCOUNT, "린넨 원피스", limit=10, min_searches=100)
     keywords = [k["keyword"] for k in result["keywords"]]
     assert keywords == ["여름원피스", "린넨원피스", "린넨원피스롱"]
     assert result["keywords"][1]["contains_seed"] is True
@@ -118,21 +142,21 @@ def test_related_keywords_sorted_and_filtered(fakes):
 @pytest.mark.django_db
 def test_keyword_trend_summary(fakes):
     _, openapi = fakes
-    result = services.get_keyword_trend(["린넨 원피스"], months=6)
+    result = services.get_keyword_trend(ACCOUNT, ["린넨 원피스"], months=6)
     series = result["series"][0]
     assert series["summary"]["peak_period"] == "2026-04-01"
     assert series["summary"]["low_period"] == "2026-01-01"
     assert series["summary"]["recent_change_pct"] == pytest.approx((220 / 3) / (90 / 3) * 100 - 100, abs=0.1)
 
-    services.get_keyword_trend(["린넨 원피스"], category="패션의류")
+    services.get_keyword_trend(ACCOUNT, ["린넨 원피스"], category="패션의류")
     assert openapi.trends[-1] == ("shopping", "패션의류")
     with pytest.raises(ValueError):
-        services.get_keyword_trend([])
+        services.get_keyword_trend(ACCOUNT, [])
 
 
 @pytest.mark.django_db
 def test_analyze_competitors(fakes):
-    result = services.analyze_competitors("린넨 원피스", sample=3)
+    result = services.analyze_competitors(ACCOUNT, "린넨 원피스", sample=3)
     assert result["total_listings"] == 180000
     assert result["price"]["median"] == 29900
     assert result["price"]["min"] == 19900

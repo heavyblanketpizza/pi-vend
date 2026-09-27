@@ -16,6 +16,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
+from pivend.accounts import ratelimit
+from pivend.accounts.services import llm_config
+
 from .models import Conversation
 
 logger = logging.getLogger(__name__)
@@ -123,6 +126,11 @@ def send_message(request, conversation_id: int):
         return HttpResponseBadRequest("invalid JSON")
     if not text:
         return HttpResponseBadRequest("message is required")
+    llm = llm_config(request.user)
+    if llm is None:
+        return _sse_response([_sse({"type": "error", "code": "no_llm", "message": "AI 모델이 연결되지 않았어요. 설정 > API 연결에서 내 API 키를 등록해 주세요."})])
+    if not ratelimit.hit("chat", request.user.pk):
+        return _sse_response([_sse({"type": "error", "code": "rate_limited", "message": "한 시간에 보낼 수 있는 메시지 수를 넘었어요. 잠시 후 다시 시도해 주세요."})])
     if not conversation.title:
         conversation.title = " ".join(text.split())[:60]
         conversation.save(update_fields=["title", "updated_at"])
@@ -132,6 +140,7 @@ def send_message(request, conversation_id: int):
         "conversation_id": conversation.id,
         "messages": conversation.messages,
         "message": text,
+        "llm": llm,
     }
 
     def stream():
@@ -145,7 +154,11 @@ def send_message(request, conversation_id: int):
             ) as response:
                 if response.status_code != 200:
                     response.read()
-                    yield _sse({"type": "error", "message": f"Agent error {response.status_code}: {response.text[:300]}"})
+                    try:
+                        detail = response.json().get("error") or response.text
+                    except ValueError:
+                        detail = response.text
+                    yield _sse({"type": "error", "message": str(detail)[:300]})
                     return
                 for line in response.iter_lines():
                     if not line.startswith("data: "):
@@ -165,7 +178,11 @@ def send_message(request, conversation_id: int):
             logger.warning("Agent stream failed: %s", exc)
             yield _sse({"type": "error", "message": f"에이전트에 연결할 수 없어요 ({exc})"})
 
-    response = StreamingHttpResponse(stream(), content_type="text/event-stream")
+    return _sse_response(stream())
+
+
+def _sse_response(events) -> StreamingHttpResponse:
+    response = StreamingHttpResponse(events, content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response

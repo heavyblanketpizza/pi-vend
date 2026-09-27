@@ -10,7 +10,9 @@
     <h1 id="chat-title">{% if current %}{{ current.title|default:"새 대화" }}{% else %}새 대화{% endif %}</h1>
     <span class="spacer"></span>
     {% if agent.online %}
-    <span class="model-pill" title="{{ agent.provider }} · {{ agent.model }}"><span class="status-dot"></span>{{ agent.name|default:agent.model }}</span>
+    <a class="model-pill" href="{% url 'connections' %}" title="{{ agent.provider }} · {{ agent.name }}"><span class="status-dot {% if agent.failing %}warn{% endif %}"></span>{{ agent.name }}</a>
+    {% elif agent.state == "no_model" %}
+    <a class="model-pill" href="{% url 'connections' %}"><span class="status-dot off"></span>AI 모델 미연결</a>
     {% else %}
     <span class="model-pill" title="{{ agent.error }}"><span class="status-dot off"></span>에이전트 오프라인</span>
     {% endif %}
@@ -41,7 +43,7 @@
       <button class="send" type="submit" id="send" aria-label="보내기" disabled>{% icon "arrow-up" "i-lg" %}</button>
     </form>
     <div class="composer-hint">
-      <span>{% if agent.online %}네이버 공식 데이터를 기반으로 답해요. 게시 전 내용을 꼭 확인하세요.{% else %}에이전트가 오프라인이에요 — <code>cd agent && npm start</code>{% endif %}</span>
+      <span>{% if agent.online %}네이버 공식 데이터를 기반으로 답해요. 게시 전 내용을 꼭 확인하세요.{% elif agent.state == "no_model" %}대화하려면 <a href="{% url 'connections' %}">설정 › API 연결</a>에서 AI 모델 키를 등록하세요.{% else %}에이전트 서비스가 오프라인이에요. 잠시 후 다시 시도해 주세요.{% endif %}</span>
       <span class="keys"><kbd>Enter</kbd> 보내기 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 줄바꿈</span>
     </div>
   </div>

@@ -1,0 +1,24 @@
+{% extends "accounts/_auth.html" %}
+{% load ui %}
+{% block title %}가입하기 · Pi-Vend{% endblock %}
+{% block card %}
+<h2>계정 만들기</h2>
+<p class="sub">가입 후 내 API 키를 연결하면 바로 쓸 수 있어요.</p>
+{% if form.non_field_errors %}<div class="callout callout-error" style="margin-top:20px">{% icon "circle-alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="field">
+    <label for="id_email">이메일</label>
+    <input class="input {% if form.email.errors %}is-invalid{% endif %}" id="id_email" type="email" name="email" value="{{ form.email.value|default:'' }}" autocomplete="email" autofocus required>
+    {% for e in form.email.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+  </div>
+  <div class="field">
+    <label for="id_password">비밀번호</label>
+    <input class="input {% if form.password.errors %}is-invalid{% endif %}" id="id_password" type="password" name="password" autocomplete="new-password" minlength="8" required>
+    {% for e in form.password.errors %}<p class="field-error">{{ e }}</p>{% empty %}<p class="field-help">8자 이상, 흔한 비밀번호나 숫자만은 안 돼요.</p>{% endfor %}
+  </div>
+  <div class="hp" aria-hidden="true"><label>웹사이트 <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+  <button class="btn btn-primary btn-lg btn-block" type="submit">가입하기</button>
+</form>
+<p class="auth-switch">이미 계정이 있나요? <a href="{% url 'login' %}">로그인</a></p>
+{% endblock %}

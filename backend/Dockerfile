@@ -23,4 +23,4 @@ RUN DJANGO_SECRET_KEY=collectstatic python manage.py collectstatic --noinput
 
 EXPOSE 8000
 # gthread workers keep SSE chat streams from blocking other requests.
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8000 --worker-class gthread --workers 2 --threads 8 --timeout 600"]
+CMD ["sh", "-c", "python manage.py check --deploy --fail-level ERROR && python manage.py migrate --noinput && python manage.py createcachetable && gunicorn config.wsgi --bind 0.0.0.0:8000 --worker-class gthread --workers 2 --threads 8 --timeout 600"]

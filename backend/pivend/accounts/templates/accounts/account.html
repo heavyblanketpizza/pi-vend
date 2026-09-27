@@ -1,0 +1,60 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}계정 · 설정 · Pi-Vend{% endblock %}
+{% block content %}
+<div class="page settings">
+  {% include "accounts/_settings_head.html" %}
+
+  <div class="conn-grid">
+    <section class="card conn-card">
+      <div class="conn-head">
+        <span class="conn-icon">{% icon "user" %}</span>
+        <div class="conn-title">
+          <h2>{{ user.email|default:user.get_username }}</h2>
+          <p>가입일 {{ user.date_joined|date:"Y년 n월 j일" }}{% if user.last_login %} · 최근 로그인 {{ user.last_login|reltime }}{% endif %}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card conn-card">
+      <div class="conn-head">
+        <span class="conn-icon">{% icon "lock" %}</span>
+        <div class="conn-title"><h2>비밀번호 변경</h2><p>변경해도 이 기기에서는 로그인이 유지돼요.</p></div>
+      </div>
+      <form class="conn-form" method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="password">
+        <div class="conn-fields cols-3">
+          {% for field in password_form %}
+          <div class="field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <input class="input {% if field.errors %}is-invalid{% endif %}" id="{{ field.id_for_label }}" type="password" name="{{ field.html_name }}" autocomplete="{% if forloop.first %}current-password{% else %}new-password{% endif %}" required>
+            {% for e in field.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="conn-actions"><button class="btn btn-primary" type="submit">비밀번호 바꾸기</button></div>
+      </form>
+    </section>
+
+    <section class="card conn-card danger-zone">
+      <div class="conn-head">
+        <span class="conn-icon">{% icon "trash-2" %}</span>
+        <div class="conn-title"><h2>계정 삭제</h2><p>스토어 데이터, 상품 초안과 상세페이지 이미지, 대화, 저장된 API 키가 모두 즉시 삭제되고 되돌릴 수 없어요.</p></div>
+      </div>
+      <form class="conn-form" method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete">
+        <div class="conn-fields cols-3">
+          <div class="field">
+            <label for="del-pw">비밀번호 확인</label>
+            <input class="input {% if delete_form.password.errors %}is-invalid{% endif %}" id="del-pw" type="password" name="password" autocomplete="current-password" required>
+            {% for e in delete_form.password.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+          </div>
+        </div>
+        <div class="conn-actions"><button class="btn btn-danger" type="submit" data-confirm="정말 삭제할까요?">{% icon "trash-2" %}계정과 데이터 삭제</button></div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

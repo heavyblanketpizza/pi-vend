@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import io
-import ipaddress
 import logging
-import socket
+import secrets
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -14,6 +13,8 @@ from django.contrib.staticfiles import finders
 from django.template.loader import render_to_string
 from django.utils import timezone
 from PIL import Image
+
+from pivend.accounts.netguard import is_public_host
 
 from .detailpage import validate_spec
 from .models import DetailPageRender, ListingDraft
@@ -27,28 +28,12 @@ FONT_FILE = "web/fonts/PretendardVariable.woff2"
 FONT_PATH = "/fonts/PretendardVariable.woff2"
 
 
-def _is_public_host(host: str) -> bool:
-    """Block loopback/private/link-local targets so a spec can't make the
-    renderer fetch internal services (e.g. cloud metadata endpoints)."""
-    if not host or host == "localhost" or host.endswith(".localhost"):
-        return False
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
-        return False
-    for info in infos:
-        address = ipaddress.ip_address(info[4][0])
-        if not address.is_global:
-            return False
-    return True
-
-
 def _guard_request(route) -> None:
     url = route.request.url
     parsed = urlparse(url)
     if parsed.scheme == "data":
         route.continue_()
-    elif parsed.scheme in {"http", "https"} and _is_public_host(parsed.hostname or ""):
+    elif parsed.scheme in {"http", "https"} and is_public_host(parsed.hostname or ""):
         route.continue_()
     else:
         logger.warning("Blocked detail-page subresource %s", url)
@@ -130,8 +115,10 @@ def render_detail_page(draft: ListingDraft, spec: dict | None = None) -> DetailP
     html = render_html(spec)
     slices, height = slice_image(screenshot_html(html), settings.DETAIL_PAGE_SLICE_HEIGHT)
 
-    stamp = timezone.now().strftime("%Y%m%d-%H%M%S-%f")
-    relative_dir = Path("detail-pages") / str(draft.id) / stamp
+    # Images are served without a login (the agent and marketplaces fetch them),
+    # so the path carries a random part that can't be guessed from the draft id.
+    stamp = timezone.now().strftime("%Y%m%d-%H%M%S")
+    relative_dir = Path("detail-pages") / str(draft.id) / f"{stamp}-{secrets.token_urlsafe(12)}"
     target_dir = Path(settings.MEDIA_ROOT) / relative_dir
     target_dir.mkdir(parents=True, exist_ok=True)
     paths = []

@@ -1,0 +1,14 @@
+{% extends "accounts/_auth.html" %}
+{% load ui %}
+{% block title %}메일을 확인하세요 · Pi-Vend{% endblock %}
+{% block card %}
+<div class="auth-icon">{% icon "mail" %}</div>
+<h2>메일함을 확인해 주세요</h2>
+<p class="sub">{% if email %}<b>{{ email }}</b>(으)로{% else %}입력한 주소로{% endif %} 인증 링크를 보냈어요. 링크를 누르면 가입이 끝나요. 링크는 24시간 동안 유효해요.</p>
+<form method="post" action="{% url 'resend_verification' %}">
+  {% csrf_token %}
+  <div class="field"><label for="id_email">메일이 오지 않았나요?</label><input class="input" id="id_email" type="email" name="email" value="{{ email }}" required></div>
+  <button class="btn btn-secondary btn-lg btn-block" type="submit">인증 메일 다시 보내기</button>
+</form>
+<p class="auth-switch"><a href="{% url 'login' %}">로그인으로 돌아가기</a></p>
+{% endblock %}

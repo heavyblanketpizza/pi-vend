@@ -77,6 +77,7 @@ def _str_list(body: dict, key: str) -> list[str]:
 @internal_endpoint()
 def keyword_stats(request, user, body):
     return research.get_keyword_stats(
+        research.account_for(user),
         _str_list(body, "keywords"), with_competition=bool(body.get("with_competition"))
     )
 
@@ -84,6 +85,7 @@ def keyword_stats(request, user, body):
 @internal_endpoint()
 def related_keywords(request, user, body):
     return research.get_related_keywords(
+        research.account_for(user),
         str(body.get("seed") or ""),
         limit=int(body.get("limit") or 50),
         min_searches=int(body.get("min_searches") or 0),
@@ -93,6 +95,7 @@ def related_keywords(request, user, body):
 @internal_endpoint()
 def keyword_trend(request, user, body):
     return research.get_keyword_trend(
+        research.account_for(user),
         _str_list(body, "keywords"),
         months=int(body.get("months") or 12),
         time_unit=body.get("time_unit") or "month",
@@ -108,7 +111,7 @@ def competitors(request, user, body):
     query = str(body.get("query") or "").strip()
     if not query:
         raise ValueError("query is required")
-    return research.analyze_competitors(query, sample=int(body.get("sample") or 40))
+    return research.analyze_competitors(research.account_for(user), query, sample=int(body.get("sample") or 40))
 
 
 @internal_endpoint()

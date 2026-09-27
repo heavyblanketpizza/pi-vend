@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Marketplace(models.TextChoices):
@@ -81,3 +85,20 @@ class DetailPageRender(models.Model):
             "height": self.height,
             "created_at": self.created_at.isoformat(),
         }
+
+
+@receiver(post_delete, sender=DetailPageRender)
+def delete_render_files(sender, instance: DetailPageRender, **kwargs):
+    """Remove the JPG slices when a render (or its draft or owner) is deleted."""
+    root = Path(settings.MEDIA_ROOT)
+    folders = set()
+    for path in instance.images:
+        file = root / path
+        file.unlink(missing_ok=True)
+        folders.add(file.parent)
+    for folder in folders:
+        try:
+            folder.rmdir()
+            folder.parent.rmdir()  # the draft's folder, once its last render is gone
+        except OSError:
+            pass

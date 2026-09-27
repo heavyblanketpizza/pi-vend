@@ -14,9 +14,8 @@ import time
 from dataclasses import dataclass
 
 import httpx
-from django.conf import settings
 
-from .errors import NaverAPIError, NaverNotConfigured
+from .errors import SEARCHAD_NOT_CONFIGURED, NaverAPIError, NaverNotConfigured
 
 BASE_URL = "https://api.searchad.naver.com"
 KEYWORDSTOOL_URI = "/keywordstool"
@@ -89,19 +88,16 @@ class KeywordToolRow:
 class SearchAdClient:
     def __init__(
         self,
-        api_key: str | None = None,
-        secret_key: str | None = None,
-        customer_id: str | None = None,
+        api_key: str,
+        secret_key: str,
+        customer_id: str,
         http: httpx.Client | None = None,
     ):
-        self.api_key = api_key if api_key is not None else settings.NAVER_SEARCHAD_API_KEY
-        self.secret_key = secret_key if secret_key is not None else settings.NAVER_SEARCHAD_SECRET_KEY
-        self.customer_id = customer_id if customer_id is not None else settings.NAVER_SEARCHAD_CUSTOMER_ID
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.customer_id = customer_id
         if not (self.api_key and self.secret_key and self.customer_id):
-            raise NaverNotConfigured(
-                "Naver 검색광고 API is not configured "
-                "(NAVER_SEARCHAD_API_KEY / NAVER_SEARCHAD_SECRET_KEY / NAVER_SEARCHAD_CUSTOMER_ID)."
-            )
+            raise NaverNotConfigured(SEARCHAD_NOT_CONFIGURED)
         self.http = http or httpx.Client(base_url=BASE_URL, timeout=15.0)
 
     def _headers(self, method: str, uri: str) -> dict[str, str]:

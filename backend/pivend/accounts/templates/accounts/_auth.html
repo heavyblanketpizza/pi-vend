@@ -1,0 +1,25 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block body %}
+<div class="auth">
+  <section class="auth-art">
+    <div class="brand" style="padding:0">{% brand_mark %}<span class="brand-name">Pi-Vend</span></div>
+    <div>
+      <h1>팔리는 상품명과<br>상세페이지를, 데이터로.</h1>
+      <p class="lead">네이버·쿠팡 셀러를 위한 AI 에이전트. 공식 검색 데이터로 키워드를 고르고, 상품명과 상세페이지까지 한 번에 만들어요.</p>
+      <div class="auth-points">
+        <div class="auth-point"><span class="ico">{% icon "chart-column" %}</span>검색량·경쟁강도·트렌드로 키워드 선정</div>
+        <div class="auth-point"><span class="ico">{% icon "type" %}</span>가이드에 맞춘 상품명과 검색 태그</div>
+        <div class="auth-point"><span class="ico">{% icon "smartphone" %}</span>860px 모바일 상세페이지 자동 생성</div>
+      </div>
+    </div>
+    <p class="auth-foot">내 API 키로 동작해요 · Claude · OpenAI · Gemini · 내 LLM 서버</p>
+  </section>
+
+  <section class="auth-form">
+    <div class="auth-card">
+      {% block card %}{% endblock %}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+{% load ui %}
+{% if not cred %}<span class="badge badge-outline">미연결</span>
+{% elif cred.status == "ok" %}<span class="badge badge-success" title="{{ cred.status_message }}">{% icon "check" %}연결됨</span>
+{% elif cred.status == "error" %}<span class="badge badge-danger" title="{{ cred.status_message }}">{% icon "circle-alert" %}확인 필요</span>
+{% else %}<span class="badge badge-warning">테스트 전</span>{% endif %}
